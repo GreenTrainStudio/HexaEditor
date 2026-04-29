@@ -296,6 +296,33 @@
       deleteModeLabel.style.fontWeight = isDeleteMode ? '700' : '400';
     }
 
+    function setExclusiveMode(mode) {
+      const shouldEnable = mode === 'delete' ? !isDeleteMode
+        : mode === 'add' ? !isAddMode
+        : mode === 'rotate' ? !isRotateMode
+        : !isColorMode;
+
+      isDeleteMode = false;
+      isAddMode = false;
+      isRotateMode = false;
+      isColorMode = false;
+
+      if (shouldEnable) {
+        if (mode === 'delete') isDeleteMode = true;
+        if (mode === 'add') isAddMode = true;
+        if (mode === 'rotate') isRotateMode = true;
+        if (mode === 'color') isColorMode = true;
+      } else if (mode === 'color') {
+        hideColorPicker();
+      }
+
+      if (!isColorMode) hideColorPicker();
+      updateDeleteModeLabel();
+      updateAddModeLabel();
+      updateRotateModeLabel();
+      updateColorModeLabel();
+    }
+
     function getCellByCanvasPoint(clientX, clientY, level) {
       const rect = viewport.getBoundingClientRect();
       const px = (clientX - rect.left - panX) / currentZoom;
@@ -526,27 +553,22 @@
 
     window.addEventListener('keydown', (event) => {
       if (event.code === 'KeyD' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isDeleteMode = !isDeleteMode;
-        updateDeleteModeLabel();
+        setExclusiveMode('delete');
         event.preventDefault();
         return;
       }
       if (event.code === 'KeyA' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isAddMode = !isAddMode;
-        updateAddModeLabel();
+        setExclusiveMode('add');
         event.preventDefault();
         return;
       }
       if (event.code === 'KeyR' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isRotateMode = !isRotateMode;
-        updateRotateModeLabel();
+        setExclusiveMode('rotate');
         event.preventDefault();
         return;
       }
       if (event.code === 'KeyC' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isColorMode = !isColorMode;
-        if (!isColorMode) hideColorPicker();
-        updateColorModeLabel();
+        setExclusiveMode('color');
         event.preventDefault();
         return;
       }
