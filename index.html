@@ -149,7 +149,9 @@
       const margin = radius * 2;
       const cellCenters = level.Cells.map(c => {
         const x = margin + radius * sqrt3 * (c.X + 0.5 * (c.Y & 1));
-        const y = margin + radius * 1.5 * c.Y;
+        const boardHeight = Number(level.Height ?? 0);
+        const yIndex = boardHeight > 0 ? (boardHeight - 1 - c.Y) : c.Y;
+        const y = margin + radius * 1.5 * yIndex;
         return { ...c, cx: x, cy: y };
       });
 
