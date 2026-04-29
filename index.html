@@ -76,24 +76,25 @@
     jsonInput.value = JSON.stringify(defaultLevel, null, 2);
 
     const SQRT3 = Math.sqrt(3);
-    // 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE
+    // Direction mapping aligned to game screenshot
     const DIR_ANGLE = {
-      0: 0,
-      1: -60,
-      2: -120,
-      3: 180,
-      4: 120,
-      5: 60,
+      0: -90,
+      1: -30,
+      2: 30,
+      3: 90,
+      4: 150,
+      5: -150,
     };
 
     function toColorCss(c) {
       return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`;
     }
 
-    function offsetToPixel(col, row, size) {
-      const x = size * SQRT3 * (col + (row % 2) * 0.5);
-      const y = size * 1.5 * row;
-      return { x, y };
+    function axialToPixel(q, r, size) {
+      return {
+        x: size * SQRT3 * (q + r / 2),
+        y: size * 1.5 * r,
+      };
     }
 
     function polygonHex(x, y, size) {
@@ -133,7 +134,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const hexSize = 36;
-      const centers = level.Cells.map(c => ({ cell: c, ...offsetToPixel(c.X, c.Y, hexSize) }));
+      const centers = level.Cells.map(c => ({ cell: c, ...axialToPixel(c.X, c.Y, hexSize) }));
       if (!centers.length) return;
 
       const minX = Math.min(...centers.map(c => c.x));
