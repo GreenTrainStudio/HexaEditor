@@ -33,7 +33,8 @@
       cursor: pointer;
     }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
-    main { padding: 12px; overflow: auto; cursor: grab; }
+    main { padding: 12px; overflow: auto; cursor: default; }
+    main.space-held { cursor: grab; }
     main.dragging { cursor: grabbing; user-select: none; }
     canvas { background: #d9d9d9; display: block; margin: 0 auto; }
   </style>
@@ -186,18 +187,21 @@
     }
 
     let isDragging = false;
+    let isSpacePressed = false;
     let dragStartX = 0;
     let dragStartY = 0;
     let dragStartScrollLeft = 0;
     let dragStartScrollTop = 0;
 
     function startDrag(event) {
+      if (!isSpacePressed || event.button !== 0) return;
       isDragging = true;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
       dragStartScrollLeft = viewport.scrollLeft;
       dragStartScrollTop = viewport.scrollTop;
       viewport.classList.add('dragging');
+      event.preventDefault();
     }
 
     function moveDrag(event) {
@@ -213,13 +217,38 @@
       viewport.classList.remove('dragging');
     }
 
+    function updatePanModeVisual() {
+      viewport.classList.toggle('space-held', isSpacePressed && !isDragging);
+    }
+
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'Space') return;
+      if (!isSpacePressed) {
+        isSpacePressed = true;
+        updatePanModeVisual();
+      }
+      event.preventDefault();
+    });
+
+    window.addEventListener('keyup', (event) => {
+      if (event.code !== 'Space') return;
+      isSpacePressed = false;
+      stopDrag();
+      updatePanModeVisual();
+      event.preventDefault();
+    });
+
     renderBtn.addEventListener('click', safeRender);
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP));
     viewport.addEventListener('mousedown', startDrag);
     window.addEventListener('mousemove', moveDrag);
     window.addEventListener('mouseup', stopDrag);
-    viewport.addEventListener('mouseleave', stopDrag);
+    window.addEventListener('blur', () => {
+      isSpacePressed = false;
+      stopDrag();
+      updatePanModeVisual();
+    });
     applyZoom();
     safeRender();
   </script>
