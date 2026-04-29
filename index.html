@@ -50,6 +50,7 @@
     <span id="zoomLabel">Масштаб: 100%</span>
     <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
     <span id="addModeLabel" style="margin-left: 10px;">Режим добавления: выкл (клавиша A)</span>
+    <span id="rotateModeLabel" style="margin-left: 10px;">Режим вращения: выкл (клавиша R)</span>
     <div id="error" class="error"></div>
   </header>
   <main>
@@ -69,6 +70,7 @@
     const zoomLabel = document.getElementById('zoomLabel');
     const deleteModeLabel = document.getElementById('deleteModeLabel');
     const addModeLabel = document.getElementById('addModeLabel');
+    const rotateModeLabel = document.getElementById('rotateModeLabel');
     const viewport = document.querySelector('main');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
@@ -251,6 +253,7 @@
 
     let isDeleteMode = false;
     let isAddMode = false;
+    let isRotateMode = false;
     const undoStack = [];
 
     function updateDeleteModeLabel() {
@@ -370,6 +373,30 @@
       addModeLabel.style.fontWeight = isAddMode ? '700' : '400';
     }
 
+    function updateRotateModeLabel() {
+      rotateModeLabel.textContent = `Режим вращения: ${isRotateMode ? 'вкл' : 'выкл'} (клавиша R)`;
+      rotateModeLabel.style.color = isRotateMode ? '#003a8c' : '';
+      rotateModeLabel.style.fontWeight = isRotateMode ? '700' : '400';
+    }
+
+    function rotateCellAt(clientX, clientY) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const target = getCellByCanvasPoint(clientX, clientY, level);
+        if (!target) return;
+        const index = level.Cells.findIndex(c => c.X === target.X && c.Y === target.Y);
+        if (index < 0) return;
+        undoStack.push(JSON.stringify(level));
+        const currentDirection = Number(level.Cells[index].Direction ?? 0);
+        level.Cells[index].Direction = ((currentDirection % 6) + 1) % 6;
+        writeLevel(level);
+        safeRender();
+      } catch {
+        // Ignore invalid JSON while editing.
+      }
+    }
+
     function addCellAt(clientX, clientY) {
       try {
         const level = JSON.parse(input.value);
@@ -412,6 +439,12 @@
         event.preventDefault();
         return;
       }
+      if (event.code === 'KeyR' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        isRotateMode = !isRotateMode;
+        updateRotateModeLabel();
+        event.preventDefault();
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyZ') {
         const previous = undoStack.pop();
@@ -445,6 +478,10 @@
     viewport.addEventListener('mousedown', startDrag);
     canvas.addEventListener('click', (event) => {
       if (isSpacePressed || isDragging) return;
+      if (isRotateMode) {
+        rotateCellAt(event.clientX, event.clientY);
+        return;
+      }
       if (isAddMode) {
         addCellAt(event.clientX, event.clientY);
         return;
@@ -462,6 +499,7 @@
     });
     updateDeleteModeLabel();
     updateAddModeLabel();
+    updateRotateModeLabel();
     applyZoom();
     safeRender();
   </script>
