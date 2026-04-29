@@ -33,10 +33,10 @@
       cursor: pointer;
     }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
-    main { padding: 12px; overflow: auto; cursor: default; }
+    main { padding: 12px; overflow: hidden; cursor: default; }
     main.space-held { cursor: grab; }
     main.dragging { cursor: grabbing; user-select: none; }
-    canvas { background: #d9d9d9; display: block; margin: 0 auto; }
+    canvas { background: #d9d9d9; display: block; margin: 0; }
   </style>
 </head>
 <body>
@@ -168,13 +168,15 @@
     }
 
     let currentZoom = 1;
+    let panX = 0;
+    let panY = 0;
     const ZOOM_STEP = 0.1;
     const MIN_ZOOM = 0.5;
     const MAX_ZOOM = 2.5;
 
     function applyZoom() {
-      canvas.style.transform = `scale(${currentZoom})`;
-      canvas.style.transformOrigin = 'top center';
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+      canvas.style.transformOrigin = 'top left';
       updateZoomLabel();
     }
 
@@ -190,16 +192,16 @@
     let isSpacePressed = false;
     let dragStartX = 0;
     let dragStartY = 0;
-    let dragStartScrollLeft = 0;
-    let dragStartScrollTop = 0;
+    let dragStartPanX = 0;
+    let dragStartPanY = 0;
 
     function startDrag(event) {
       if (!isSpacePressed || event.button !== 0) return;
       isDragging = true;
       dragStartX = event.clientX;
       dragStartY = event.clientY;
-      dragStartScrollLeft = viewport.scrollLeft;
-      dragStartScrollTop = viewport.scrollTop;
+      dragStartPanX = panX;
+      dragStartPanY = panY;
       viewport.classList.add('dragging');
       event.preventDefault();
     }
@@ -208,8 +210,9 @@
       if (!isDragging) return;
       const dx = event.clientX - dragStartX;
       const dy = event.clientY - dragStartY;
-      viewport.scrollLeft = dragStartScrollLeft - dx;
-      viewport.scrollTop = dragStartScrollTop - dy;
+      panX = dragStartPanX + dx;
+      panY = dragStartPanY + dy;
+      applyZoom();
     }
 
     function stopDrag() {
