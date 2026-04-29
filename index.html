@@ -33,8 +33,10 @@
       cursor: pointer;
     }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
-    main { padding: 12px; overflow: auto; }
-    canvas { background: #d9d9d9; display: block; margin: 0 auto; }
+    main { padding: 12px; overflow: hidden; cursor: default; }
+    main.space-held { cursor: grab; }
+    main.dragging { cursor: grabbing; user-select: none; }
+    canvas { background: #d9d9d9; display: block; margin: 0; }
   </style>
 </head>
 <body>
@@ -43,6 +45,9 @@
     <textarea id="jsonInput"></textarea>
     <br />
     <button id="renderBtn">Отрисовать</button>
+    <button id="zoomOutBtn" type="button">−</button>
+    <button id="zoomInBtn" type="button">+</button>
+    <span id="zoomLabel">Масштаб: 100%</span>
     <div id="error" class="error"></div>
   </header>
   <main>
@@ -57,6 +62,10 @@
     const input = document.getElementById('jsonInput');
     const error = document.getElementById('error');
     const renderBtn = document.getElementById('renderBtn');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const zoomLabel = document.getElementById('zoomLabel');
+    const viewport = document.querySelector('main');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
 
@@ -154,7 +163,114 @@
       }
     }
 
+    function updateZoomLabel() {
+      zoomLabel.textContent = `Масштаб: ${Math.round(currentZoom * 100)}%`;
+    }
+
+    let currentZoom = 1;
+    let panX = 0;
+    let panY = 0;
+    const ZOOM_STEP = 0.1;
+    const MIN_ZOOM = 0.5;
+    const MAX_ZOOM = 2.5;
+
+    function applyZoom() {
+      canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+      canvas.style.transformOrigin = 'top left';
+      updateZoomLabel();
+    }
+
+    function setZoom(nextZoom, anchorX = 0, anchorY = 0) {
+      const clampedZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, nextZoom));
+      if (clampedZoom === currentZoom) return;
+
+      const worldX = (anchorX - panX) / currentZoom;
+      const worldY = (anchorY - panY) / currentZoom;
+      currentZoom = Number(clampedZoom.toFixed(2));
+      panX = anchorX - (worldX * currentZoom);
+      panY = anchorY - (worldY * currentZoom);
+      applyZoom();
+    }
+
+    function changeZoom(delta, anchorX = 0, anchorY = 0) {
+      setZoom(currentZoom + delta, anchorX, anchorY);
+    }
+
+    function handleWheelZoom(event) {
+      event.preventDefault();
+      const wheelDirection = event.deltaY < 0 ? 1 : -1;
+      const rect = viewport.getBoundingClientRect();
+      const anchorX = event.clientX - rect.left;
+      const anchorY = event.clientY - rect.top;
+      changeZoom(wheelDirection * ZOOM_STEP, anchorX, anchorY);
+    }
+
+    let isDragging = false;
+    let isSpacePressed = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragStartPanX = 0;
+    let dragStartPanY = 0;
+
+    function startDrag(event) {
+      if (!isSpacePressed || event.button !== 0) return;
+      isDragging = true;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragStartPanX = panX;
+      dragStartPanY = panY;
+      viewport.classList.add('dragging');
+      event.preventDefault();
+    }
+
+    function moveDrag(event) {
+      if (!isDragging) return;
+      const dx = event.clientX - dragStartX;
+      const dy = event.clientY - dragStartY;
+      panX = dragStartPanX + dx;
+      panY = dragStartPanY + dy;
+      applyZoom();
+    }
+
+    function stopDrag() {
+      isDragging = false;
+      viewport.classList.remove('dragging');
+    }
+
+    function updatePanModeVisual() {
+      viewport.classList.toggle('space-held', isSpacePressed && !isDragging);
+    }
+
+    window.addEventListener('keydown', (event) => {
+      if (event.code !== 'Space') return;
+      if (!isSpacePressed) {
+        isSpacePressed = true;
+        updatePanModeVisual();
+      }
+      event.preventDefault();
+    });
+
+    window.addEventListener('keyup', (event) => {
+      if (event.code !== 'Space') return;
+      isSpacePressed = false;
+      stopDrag();
+      updatePanModeVisual();
+      event.preventDefault();
+    });
+
     renderBtn.addEventListener('click', safeRender);
+    zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
+    zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
+    viewport.addEventListener('mousedown', startDrag);
+    viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('blur', () => {
+      isSpacePressed = false;
+      stopDrag();
+      updatePanModeVisual();
+    });
+    applyZoom();
     safeRender();
   </script>
 </body>
