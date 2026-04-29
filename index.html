@@ -107,6 +107,20 @@
       ctx.stroke();
     }
 
+    function drawGridHex(cx, cy, size) {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i);
+        const px = cx + size * Math.cos(angle);
+        const py = cy + size * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = 'rgba(0,0,0,.13)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
     function drawArrow(cx, cy, dir) {
       // 0=Up (0°), 1=UpRight, 2=DownRight, 3=Down, 4=DownLeft, 5=UpLeft
       const directionAngles = [0, 45, 135, 180, 225, 315];
@@ -134,21 +148,47 @@
       ctx.restore();
     }
 
-    function render(level) {
-      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
-      const minX = Math.min(...centers.map(c => c.center.x));
-      const minY = Math.min(...centers.map(c => c.center.y));
-      const maxX = Math.max(...centers.map(c => c.center.x));
-      const maxY = Math.max(...centers.map(c => c.center.y));
-
+    function getLevelLayout(level) {
+      const width = Math.max(0, Number(level.Width) || 0);
+      const height = Math.max(0, Number(level.Height) || 0);
+      const gridCoords = [];
+      for (let x = 0; x < width; x++) {
+        for (let y = 0; y < height; y++) {
+          gridCoords.push({ x, y, center: hexCenter(x, y) });
+        }
+      }
+      const fallbackCenter = { x: 0, y: 0 };
+      const allCenters = [
+        ...gridCoords.map(c => c.center),
+        ...level.Cells.map(c => hexCenter(c.X, c.Y)),
+        fallbackCenter
+      ];
+      const minX = Math.min(...allCenters.map(c => c.x));
+      const minY = Math.min(...allCenters.map(c => c.y));
+      const maxX = Math.max(...allCenters.map(c => c.x));
+      const maxY = Math.max(...allCenters.map(c => c.y));
       const pad = HEX_SIZE + 20;
-      canvas.width = Math.ceil((maxX - minX) + pad * 2 + HEX_WIDTH);
-      canvas.height = Math.ceil((maxY - minY) + pad * 2 + HEX_HEIGHT);
+
+      return { width, height, gridCoords, minX, minY, maxX, maxY, pad };
+    }
+
+    function render(level) {
+      const layout = getLevelLayout(level);
+
+      canvas.width = Math.ceil((layout.maxX - layout.minX) + layout.pad * 2 + HEX_WIDTH);
+      canvas.height = Math.ceil((layout.maxY - layout.minY) + layout.pad * 2 + HEX_HEIGHT);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      centers.forEach(c => {
-        const cx = c.center.x - minX + pad;
-        const cy = (maxY - c.center.y) + pad;
+      layout.gridCoords.forEach(cell => {
+        const cx = cell.center.x - layout.minX + layout.pad;
+        const cy = (layout.maxY - cell.center.y) + layout.pad;
+        drawGridHex(cx, cy, HEX_SIZE);
+      });
+
+      level.Cells.forEach(c => {
+        const center = hexCenter(c.X, c.Y);
+        const cx = center.x - layout.minX + layout.pad;
+        const cy = (layout.maxY - center.y) + layout.pad;
         drawHex(cx, cy, HEX_SIZE, rgba(c.Color));
         drawArrow(cx, cy, c.Direction ?? 0);
       });
@@ -269,14 +309,11 @@
       const rect = viewport.getBoundingClientRect();
       const px = (clientX - rect.left - panX) / currentZoom;
       const py = (clientY - rect.top - panY) / currentZoom;
-      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
-      const minX = Math.min(...centers.map(c => c.center.x));
-      const maxY = Math.max(...centers.map(c => c.center.y));
-      const pad = HEX_SIZE + 20;
+      const layout = getLevelLayout(level);
       for (const cell of level.Cells) {
         const world = hexCenter(cell.X, cell.Y);
-        const cx = world.x - minX + pad;
-        const cy = (maxY - world.y) + pad;
+        const cx = world.x - layout.minX + layout.pad;
+        const cy = (layout.maxY - world.y) + layout.pad;
         const dx = px - cx;
         const dy = py - cy;
         if ((dx * dx + dy * dy) <= HEX_SIZE * HEX_SIZE) {
@@ -291,19 +328,16 @@
       const px = (clientX - rect.left - panX) / currentZoom;
       const py = (clientY - rect.top - panY) / currentZoom;
 
-      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
-      const minX = Math.min(...centers.map(c => c.center.x));
-      const maxY = Math.max(...centers.map(c => c.center.y));
-      const pad = HEX_SIZE + 20;
+      const layout = getLevelLayout(level);
 
       let best = null;
       let bestDist = Number.POSITIVE_INFINITY;
 
-      for (let x = 0; x < (level.Width ?? 0); x++) {
-        for (let y = 0; y < (level.Height ?? 0); y++) {
+      for (let x = 0; x < layout.width; x++) {
+        for (let y = 0; y < layout.height; y++) {
           const world = hexCenter(x, y);
-          const cx = world.x - minX + pad;
-          const cy = (maxY - world.y) + pad;
+          const cx = world.x - layout.minX + layout.pad;
+          const cy = (layout.maxY - world.y) + layout.pad;
           const dx = px - cx;
           const dy = py - cy;
           const dist = dx * dx + dy * dy;
