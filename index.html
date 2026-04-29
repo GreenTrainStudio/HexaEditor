@@ -33,7 +33,21 @@
       cursor: pointer;
     }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
-    main { padding: 12px; overflow: hidden; cursor: default; }
+    main { padding: 12px; overflow: hidden; cursor: default; position: relative; }
+    .color-picker-popup {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #c8c8c8;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,.12);
+      padding: 10px;
+      z-index: 10;
+      width: 220px;
+      display: none;
+    }
+    .color-picker-popup label { display:block; font-size:12px; margin-top:6px; }
+    .color-picker-popup input[type="number"], .color-picker-popup input[type="text"] { width: 62px; }
+    .rgb-row { display:flex; gap:6px; }
     main.space-held { cursor: grab; }
     main.dragging { cursor: grabbing; user-select: none; }
     canvas { background: #d9d9d9; display: block; margin: 0; }
@@ -51,10 +65,21 @@
     <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
     <span id="addModeLabel" style="margin-left: 10px;">Режим добавления: выкл (клавиша A)</span>
     <span id="rotateModeLabel" style="margin-left: 10px;">Режим вращения: выкл (клавиша R)</span>
+    <span id="colorModeLabel" style="margin-left: 10px;">Режим цвета: выкл (клавиша C)</span>
     <div id="error" class="error"></div>
   </header>
   <main>
     <canvas id="canvas"></canvas>
+    <div id="colorPickerPopup" class="color-picker-popup">
+      <label>Палитра RGB <input id="pickerColor" type="color" /></label>
+      <label>RGB</label>
+      <div class="rgb-row">
+        <input id="pickerR" type="number" min="0" max="255" />
+        <input id="pickerG" type="number" min="0" max="255" />
+        <input id="pickerB" type="number" min="0" max="255" />
+      </div>
+      <label>HEX <input id="pickerHex" type="text" placeholder="#RRGGBB" /></label>
+    </div>
   </main>
 
   <script>
@@ -71,6 +96,13 @@
     const deleteModeLabel = document.getElementById('deleteModeLabel');
     const addModeLabel = document.getElementById('addModeLabel');
     const rotateModeLabel = document.getElementById('rotateModeLabel');
+    const colorModeLabel = document.getElementById('colorModeLabel');
+    const colorPickerPopup = document.getElementById('colorPickerPopup');
+    const pickerColor = document.getElementById('pickerColor');
+    const pickerR = document.getElementById('pickerR');
+    const pickerG = document.getElementById('pickerG');
+    const pickerB = document.getElementById('pickerB');
+    const pickerHex = document.getElementById('pickerHex');
     const viewport = document.querySelector('main');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
@@ -254,6 +286,8 @@
     let isDeleteMode = false;
     let isAddMode = false;
     let isRotateMode = false;
+    let isColorMode = false;
+    let activeColorCell = null;
     const undoStack = [];
 
     function updateDeleteModeLabel() {
@@ -426,6 +460,70 @@
       }
     }
 
+
+    function updateColorModeLabel() {
+      colorModeLabel.textContent = `Режим цвета: ${isColorMode ? 'вкл' : 'выкл'} (клавиша C)`;
+      colorModeLabel.style.color = isColorMode ? '#7a2cff' : '';
+      colorModeLabel.style.fontWeight = isColorMode ? '700' : '400';
+    }
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(v => Number(v).toString(16).padStart(2, '0')).join('').toUpperCase();
+    }
+
+    function hexToRgb(hex) {
+      const cleaned = hex.trim().replace('#', '');
+      if (!/^[0-9a-fA-F]{6}$/.test(cleaned)) return null;
+      return {
+        r: parseInt(cleaned.slice(0, 2), 16),
+        g: parseInt(cleaned.slice(2, 4), 16),
+        b: parseInt(cleaned.slice(4, 6), 16),
+      };
+    }
+
+    function hideColorPicker() {
+      colorPickerPopup.style.display = 'none';
+      activeColorCell = null;
+    }
+
+    function setPickerValues(color) {
+      pickerColor.value = rgbToHex(color.r, color.g, color.b);
+      pickerR.value = color.r;
+      pickerG.value = color.g;
+      pickerB.value = color.b;
+      pickerHex.value = rgbToHex(color.r, color.g, color.b);
+    }
+
+    function applyColorToActiveCell(color) {
+      if (!activeColorCell) return;
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const cell = level.Cells.find(c => c.X === activeColorCell.X && c.Y === activeColorCell.Y);
+        if (!cell) return;
+        cell.Color = { r: color.r, g: color.g, b: color.b, a: cell.Color?.a ?? 255 };
+        writeLevel(level);
+        safeRender();
+      } catch {}
+    }
+
+    function openColorPickerForCell(clientX, clientY) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const cell = getCellByCanvasPoint(clientX, clientY, level);
+        if (!cell) return;
+        undoStack.push(JSON.stringify(level));
+        activeColorCell = { X: cell.X, Y: cell.Y };
+        const color = cell.Color ?? { r: 180, g: 180, b: 180, a: 255 };
+        setPickerValues(color);
+        const rect = viewport.getBoundingClientRect();
+        colorPickerPopup.style.left = `${Math.min(clientX - rect.left + 12, rect.width - 230)}px`;
+        colorPickerPopup.style.top = `${Math.min(clientY - rect.top + 12, rect.height - 170)}px`;
+        colorPickerPopup.style.display = 'block';
+      } catch {}
+    }
+
     window.addEventListener('keydown', (event) => {
       if (event.code === 'KeyD' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
         isDeleteMode = !isDeleteMode;
@@ -442,6 +540,13 @@
       if (event.code === 'KeyR' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
         isRotateMode = !isRotateMode;
         updateRotateModeLabel();
+        event.preventDefault();
+        return;
+      }
+      if (event.code === 'KeyC' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        isColorMode = !isColorMode;
+        if (!isColorMode) hideColorPicker();
+        updateColorModeLabel();
         event.preventDefault();
         return;
       }
@@ -486,6 +591,10 @@
         addCellAt(event.clientX, event.clientY);
         return;
       }
+      if (isColorMode) {
+        openColorPickerForCell(event.clientX, event.clientY);
+        return;
+      }
       if (!isDeleteMode) return;
       deleteCellAt(event.clientX, event.clientY);
     });
@@ -500,6 +609,36 @@
     updateDeleteModeLabel();
     updateAddModeLabel();
     updateRotateModeLabel();
+    updateColorModeLabel();
+
+    pickerColor.addEventListener('input', () => {
+      const rgb = hexToRgb(pickerColor.value);
+      if (!rgb) return;
+      setPickerValues(rgb);
+      applyColorToActiveCell(rgb);
+    });
+
+    [pickerR, pickerG, pickerB].forEach(inputEl => inputEl.addEventListener('input', () => {
+      const color = {
+        r: Math.max(0, Math.min(255, Number(pickerR.value || 0))),
+        g: Math.max(0, Math.min(255, Number(pickerG.value || 0))),
+        b: Math.max(0, Math.min(255, Number(pickerB.value || 0))),
+      };
+      setPickerValues(color);
+      applyColorToActiveCell(color);
+    }));
+
+    pickerHex.addEventListener('change', () => {
+      const rgb = hexToRgb(pickerHex.value);
+      if (!rgb) return;
+      setPickerValues(rgb);
+      applyColorToActiveCell(rgb);
+    });
+
+    viewport.addEventListener('mousedown', (event) => {
+      if (colorPickerPopup.style.display === 'block' && !colorPickerPopup.contains(event.target)) hideColorPicker();
+    });
+
     applyZoom();
     safeRender();
   </script>
