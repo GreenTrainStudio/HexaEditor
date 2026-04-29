@@ -90,10 +90,11 @@
       return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`;
     }
 
+    // World coordinates: (0,0) is bottom-left, X grows to the right, Y grows upward
     function axialToPixel(q, r, size) {
       return {
         x: size * SQRT3 * (q + r / 2),
-        y: size * 1.5 * r,
+        y: -size * 1.5 * r,
       };
     }
 
