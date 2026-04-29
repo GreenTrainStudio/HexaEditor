@@ -95,7 +95,8 @@
     }
 
     function drawArrow(cx, cy, dir) {
-      const directionAngles = [-90, -30, 30, 90, 150, 210];
+      // 0=Up, 1=UpRight, 2=DownRight, 3=Down, 4=DownLeft, 5=UpLeft
+      const directionAngles = [-90, -45, 45, 90, 135, -135];
       const angle = (directionAngles[((dir % 6) + 6) % 6]) * Math.PI / 180;
       const len = HEX_SIZE * 0.55;
       ctx.save();
