@@ -82,14 +82,23 @@
   <script>
     const example = {"Width":7,"Height":6,"Cells":[{"Direction":5,"X":3,"Y":0},{"Direction":5,"X":2,"Y":1},{"Direction":3,"X":3,"Y":1},{"Direction":0,"X":4,"Y":1},{"Direction":4,"X":1,"Y":2},{"Direction":3,"X":2,"Y":2},{"Direction":5,"X":3,"Y":2},{"Direction":0,"X":4,"Y":2},{"Direction":4,"X":5,"Y":2},{"Direction":1,"X":0,"Y":3},{"Direction":5,"X":1,"Y":3},{"Direction":0,"X":2,"Y":3},{"Direction":1,"X":3,"Y":3},{"Direction":0,"X":4,"Y":3},{"Direction":0,"X":5,"Y":3},{"Direction":0,"X":6,"Y":3},{"Direction":4,"X":0,"Y":4},{"Direction":4,"X":1,"Y":4},{"Direction":0,"X":2,"Y":4},{"Direction":1,"X":3,"Y":4},{"Direction":2,"X":4,"Y":4},{"Direction":5,"X":5,"Y":4},{"Direction":5,"X":6,"Y":4},{"Direction":3,"X":1,"Y":5},{"Direction":4,"X":2,"Y":5},{"Direction":1,"X":4,"Y":5},{"Direction":1,"X":5,"Y":5}]};
 
-    const directionColors = [
-      '#6aa93d',
-      '#58b33b',
-      '#c58a3e',
-      '#d19345',
-      '#b7d75a',
-      '#7bab3a'
-    ];
+    function mixHex(c1, c2, t) {
+      const a = parseInt(c1.slice(1), 16);
+      const b = parseInt(c2.slice(1), 16);
+      const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+      const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+      const r = Math.round(ar + (br - ar) * t);
+      const g = Math.round(ag + (bg - ag) * t);
+      const bl = Math.round(ab + (bb - ab) * t);
+      return `#${[r,g,bl].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function colorByHeight(y, boardHeight) {
+      const top = '#ffad33';
+      const bottom = '#ff4a4a';
+      const t = boardHeight > 1 ? y / (boardHeight - 1) : 0;
+      return mixHex(top, bottom, t);
+    }
 
     const canvas = document.getElementById('stage');
     const ctx = canvas.getContext('2d');
@@ -121,7 +130,7 @@
     }
 
     function drawArrow(cx, cy, radius, dir) {
-      const angle = (Math.PI / 180) * (dir * 60 - 30);
+      const angle = (Math.PI / 180) * (dir * 60 + 90);
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(angle);
@@ -173,7 +182,7 @@
       }
 
       for (const c of cellCenters) {
-        const color = directionColors[c.Direction % directionColors.length] || '#93b84f';
+        const color = colorByHeight(c.Y, Number(level.Height ?? 0));
         drawPolygon(hexPoints(c.cx, c.cy, radius), color);
         drawArrow(c.cx, c.cy, radius, c.Direction);
       }
