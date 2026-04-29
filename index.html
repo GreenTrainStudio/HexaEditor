@@ -60,25 +60,27 @@
 
     input.value = JSON.stringify(sampleLevel, null, 2);
 
-    const HEX_SIZE = 40;
+    const HEX_SIZE = 38;
     const SQRT3 = Math.sqrt(3);
-    const HEX_WIDTH = SQRT3 * HEX_SIZE;
-    const VERT_STEP = 1.5 * HEX_SIZE;
+    // Flat-top hex geometry
+    const HEX_WIDTH = 2 * HEX_SIZE;
+    const HEX_HEIGHT = SQRT3 * HEX_SIZE;
+    const HORIZ_STEP = 1.5 * HEX_SIZE;
 
     function rgba(c) {
       return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`;
     }
 
     function hexCenter(x, y) {
-      const cx = x * HEX_WIDTH;
-      const cy = y * VERT_STEP - ((x % 2) ? VERT_STEP / 2 : 0);
+      const cx = x * HORIZ_STEP;
+      const cy = y * HEX_HEIGHT - ((x % 2) ? HEX_HEIGHT / 2 : 0);
       return { x: cx, y: cy };
     }
 
     function drawHex(cx, cy, size, fill) {
       ctx.beginPath();
       for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 180) * (60 * i - 30);
+        const angle = (Math.PI / 180) * (60 * i);
         const px = cx + size * Math.cos(angle);
         const py = cy + size * Math.sin(angle);
         if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
@@ -92,7 +94,8 @@
     }
 
     function drawArrow(cx, cy, dir) {
-      const angle = ((dir % 6) * 60 - 90) * Math.PI / 180;
+      const directionAngles = [-90, -30, 30, 90, 150, 210];
+      const angle = (directionAngles[((dir % 6) + 6) % 6]) * Math.PI / 180;
       const len = HEX_SIZE * 0.55;
       ctx.save();
       ctx.translate(cx, cy);
@@ -124,8 +127,8 @@
       const maxY = Math.max(...centers.map(c => c.center.y));
 
       const pad = HEX_SIZE + 20;
-      canvas.width = Math.ceil((maxX - minX) + pad * 2 + HEX_SIZE);
-      canvas.height = Math.ceil((maxY - minY) + pad * 2 + HEX_SIZE);
+      canvas.width = Math.ceil((maxX - minX) + pad * 2 + HEX_WIDTH);
+      canvas.height = Math.ceil((maxY - minY) + pad * 2 + HEX_HEIGHT);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       centers.forEach(c => {
