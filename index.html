@@ -43,6 +43,9 @@
     <textarea id="jsonInput"></textarea>
     <br />
     <button id="renderBtn">Отрисовать</button>
+    <button id="zoomOutBtn" type="button">−</button>
+    <button id="zoomInBtn" type="button">+</button>
+    <span id="zoomLabel">Масштаб: 100%</span>
     <div id="error" class="error"></div>
   </header>
   <main>
@@ -57,6 +60,9 @@
     const input = document.getElementById('jsonInput');
     const error = document.getElementById('error');
     const renderBtn = document.getElementById('renderBtn');
+    const zoomInBtn = document.getElementById('zoomInBtn');
+    const zoomOutBtn = document.getElementById('zoomOutBtn');
+    const zoomLabel = document.getElementById('zoomLabel');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
 
@@ -154,7 +160,33 @@
       }
     }
 
+    function updateZoomLabel() {
+      zoomLabel.textContent = `Масштаб: ${Math.round(currentZoom * 100)}%`;
+    }
+
+    let currentZoom = 1;
+    const ZOOM_STEP = 0.1;
+    const MIN_ZOOM = 0.5;
+    const MAX_ZOOM = 2.5;
+
+    function applyZoom() {
+      canvas.style.transform = `scale(${currentZoom})`;
+      canvas.style.transformOrigin = 'top center';
+      updateZoomLabel();
+    }
+
+    function changeZoom(delta) {
+      const nextZoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, currentZoom + delta));
+      if (nextZoom !== currentZoom) {
+        currentZoom = Number(nextZoom.toFixed(2));
+        applyZoom();
+      }
+    }
+
     renderBtn.addEventListener('click', safeRender);
+    zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP));
+    zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP));
+    applyZoom();
     safeRender();
   </script>
 </body>
