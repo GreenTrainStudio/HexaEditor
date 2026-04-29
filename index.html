@@ -72,8 +72,9 @@
     }
 
     function hexCenter(x, y) {
+      // Game coordinates: (0,0) is bottom-left, Y grows upward.
       const cx = x * HORIZ_STEP;
-      const cy = y * HEX_HEIGHT - ((x % 2) ? HEX_HEIGHT / 2 : 0);
+      const cy = y * HEX_HEIGHT + ((x % 2) ? HEX_HEIGHT / 2 : 0);
       return { x: cx, y: cy };
     }
 
@@ -133,7 +134,7 @@
 
       centers.forEach(c => {
         const cx = c.center.x - minX + pad;
-        const cy = c.center.y - minY + pad;
+        const cy = (maxY - c.center.y) + pad;
         drawHex(cx, cy, HEX_SIZE, rgba(c.Color));
         drawArrow(cx, cy, c.Direction ?? 0);
       });
