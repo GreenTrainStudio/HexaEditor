@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hex Level Viewer</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #d9d9d9;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+    .panel {
+      padding: 12px;
+      background: #f5f5f5;
+      border-bottom: 1px solid #c7c7c7;
+      display: grid;
+      gap: 8px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 120px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    button {
+      width: fit-content;
+      background: #2f71ff;
+      color: #fff;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #1f5ce2; }
+    #status { color: #8a1f1f; font-size: 13px; }
+    .canvas-wrap {
+      display: grid;
+      place-items: center;
+      padding: 16px;
+    }
+    canvas {
+      max-width: 100%;
+      max-height: calc(100vh - 260px);
+      background: transparent;
+    }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <strong>JSON уровня</strong>
+    <textarea id="jsonInput"></textarea>
+    <button id="renderBtn">Отрисовать</button>
+    <div id="status"></div>
+  </div>
+  <div class="canvas-wrap">
+    <canvas id="hexCanvas" width="900" height="650"></canvas>
+  </div>
+
+  <script>
+    const defaultLevel = {"Width":7,"Height":6,"Cells":[{"Direction":5,"X":3,"Y":0,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":2,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":3,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":1,"X":4,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":1,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":2,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":3,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":4,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":5,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":3,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":1,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":2,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":3,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":6,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":4,"X":1,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":0,"X":2,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":3,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":5,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":6,"Y":4,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":1,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":5,"X":2,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":4,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}}]};
+
+    const canvas = document.getElementById('hexCanvas');
+    const ctx = canvas.getContext('2d');
+    const jsonInput = document.getElementById('jsonInput');
+    const status = document.getElementById('status');
+
+    jsonInput.value = JSON.stringify(defaultLevel, null, 2);
+
+    const SQRT3 = Math.sqrt(3);
+    // Direction mapping aligned to game screenshot
+    const DIR_ANGLE = {
+      0: -90,
+      1: -30,
+      2: 30,
+      3: 90,
+      4: 150,
+      5: -150,
+    };
+
+    function toColorCss(c) {
+      return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`;
+    }
+
+    // Double-height horizontal coordinates (pointy hexes):
+    // (0,0) is bottom-left, X grows left->right, Y grows bottom->top.
+    // Odd columns are shifted UP (as requested).
+    function doubleHeightToPixel(x, y, size) {
+      const colShiftUp = (x % 2) ? 0.75 * size : 0;
+      return {
+        x: x * (SQRT3 * size * 0.5),
+        y: -(y * (size * 1.5) + colShiftUp),
+      };
+    }
+
+    function polygonHex(x, y, size) {
+      const pts = [];
+      for (let i = 0; i < 6; i++) {
+        const ang = (60 * i - 30) * Math.PI / 180;
+        pts.push({ x: x + size * Math.cos(ang), y: y + size * Math.sin(ang) });
+      }
+      return pts;
+    }
+
+    function drawArrow(x, y, size, direction) {
+      const angleDeg = DIR_ANGLE[direction] ?? 0;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate((angleDeg * Math.PI) / 180);
+      ctx.scale(size / 42, size / 42);
+      ctx.beginPath();
+      ctx.moveTo(0, -26);
+      ctx.lineTo(14, -12);
+      ctx.lineTo(7, -12);
+      ctx.lineTo(7, 20);
+      ctx.lineTo(-7, 20);
+      ctx.lineTo(-7, -12);
+      ctx.lineTo(-14, -12);
+      ctx.closePath();
+      ctx.fillStyle = '#f3f3f3';
+      ctx.strokeStyle = '#b3b3b3';
+      ctx.lineWidth = 3;
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function render(level) {
+      status.textContent = '';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const hexSize = 36;
+      const centers = level.Cells.map(c => ({ cell: c, ...doubleHeightToPixel(c.X, c.Y, hexSize) }));
+      if (!centers.length) return;
+
+      const minX = Math.min(...centers.map(c => c.x));
+      const minY = Math.min(...centers.map(c => c.y));
+      const maxX = Math.max(...centers.map(c => c.x));
+      const maxY = Math.max(...centers.map(c => c.y));
+      const dx = (canvas.width - (maxX - minX)) / 2 - minX;
+      const dy = (canvas.height - (maxY - minY)) / 2 - minY;
+
+      for (const { cell, x, y } of centers) {
+        const cx = x + dx;
+        const cy = y + dy;
+        const hex = polygonHex(cx, cy, hexSize);
+
+        ctx.beginPath();
+        ctx.moveTo(hex[0].x, hex[0].y);
+        for (let i = 1; i < hex.length; i++) ctx.lineTo(hex[i].x, hex[i].y);
+        ctx.closePath();
+
+        ctx.fillStyle = toColorCss(cell.Color);
+        ctx.strokeStyle = 'rgba(120, 15, 15, 0.55)';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+
+        drawArrow(cx, cy, hexSize, cell.Direction);
+      }
+    }
+
+    document.getElementById('renderBtn').addEventListener('click', () => {
+      try {
+        const level = JSON.parse(jsonInput.value);
+        if (!Array.isArray(level.Cells)) throw new Error('Поле Cells должно быть массивом');
+        render(level);
+      } catch (e) {
+        status.textContent = `Ошибка JSON: ${e.message}`;
+      }
+    });
+
+    render(defaultLevel);
+  </script>
+</body>
+</html>
