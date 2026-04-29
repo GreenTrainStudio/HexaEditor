@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hexa Level Viewer</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #efefef;
+      color: #1b1b1b;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(300px, 420px) 1fr;
+      gap: 16px;
+      min-height: 100vh;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .panel {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 25px rgba(0,0,0,.08);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 260px;
+      border: 1px solid #d8d8d8;
+      border-radius: 8px;
+      padding: 10px;
+      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    button {
+      border: 0;
+      border-radius: 8px;
+      background: #2f7e26;
+      color: #fff;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { filter: brightness(1.05); }
+    .error { color: #b00020; min-height: 22px; }
+    #stage {
+      width: 100%;
+      height: calc(100vh - 32px);
+      background: #dfdfdf;
+      border-radius: 12px;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,.08);
+    }
+    @media (max-width: 920px) {
+      .layout { grid-template-columns: 1fr; }
+      #stage { height: 70vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="panel">
+      <h2 style="margin:0">Hexa Level Viewer</h2>
+      <p style="margin:0;color:#555">Вставьте JSON уровня и нажмите «Отрисовать».</p>
+      <textarea id="jsonInput"></textarea>
+      <div class="row">
+        <button id="renderBtn">Отрисовать</button>
+        <label>Размер клетки: <input id="sizeInput" type="number" value="42" min="20" max="100" /></label>
+      </div>
+      <div class="error" id="error"></div>
+    </div>
+    <canvas id="stage"></canvas>
+  </div>
+
+  <script>
+    const example = {"Width":7,"Height":6,"Cells":[{"Direction":5,"X":3,"Y":0},{"Direction":5,"X":2,"Y":1},{"Direction":3,"X":3,"Y":1},{"Direction":0,"X":4,"Y":1},{"Direction":4,"X":1,"Y":2},{"Direction":3,"X":2,"Y":2},{"Direction":5,"X":3,"Y":2},{"Direction":0,"X":4,"Y":2},{"Direction":4,"X":5,"Y":2},{"Direction":1,"X":0,"Y":3},{"Direction":5,"X":1,"Y":3},{"Direction":0,"X":2,"Y":3},{"Direction":1,"X":3,"Y":3},{"Direction":0,"X":4,"Y":3},{"Direction":0,"X":5,"Y":3},{"Direction":0,"X":6,"Y":3},{"Direction":4,"X":0,"Y":4},{"Direction":4,"X":1,"Y":4},{"Direction":0,"X":2,"Y":4},{"Direction":1,"X":3,"Y":4},{"Direction":2,"X":4,"Y":4},{"Direction":5,"X":5,"Y":4},{"Direction":5,"X":6,"Y":4},{"Direction":3,"X":1,"Y":5},{"Direction":4,"X":2,"Y":5},{"Direction":1,"X":4,"Y":5},{"Direction":1,"X":5,"Y":5}]};
+
+    function mixHex(c1, c2, t) {
+      const a = parseInt(c1.slice(1), 16);
+      const b = parseInt(c2.slice(1), 16);
+      const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+      const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+      const r = Math.round(ar + (br - ar) * t);
+      const g = Math.round(ag + (bg - ag) * t);
+      const bl = Math.round(ab + (bb - ab) * t);
+      return `#${[r,g,bl].map(v => v.toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function colorByHeight(y, boardHeight) {
+      const top = '#ffad33';
+      const bottom = '#ff4a4a';
+      const t = boardHeight > 1 ? y / (boardHeight - 1) : 0;
+      return mixHex(top, bottom, t);
+    }
+
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    const input = document.getElementById('jsonInput');
+    const error = document.getElementById('error');
+    const sizeInput = document.getElementById('sizeInput');
+
+    input.value = JSON.stringify(example, null, 2);
+
+    function hexPoints(cx, cy, radius) {
+      const points = [];
+      for (let i = 0; i < 6; i++) {
+        const a = Math.PI / 180 * (60 * i - 30);
+        points.push([cx + radius * Math.cos(a), cy + radius * Math.sin(a)]);
+      }
+      return points;
+    }
+
+    function drawPolygon(points, fill, stroke = '#507220') {
+      ctx.beginPath();
+      ctx.moveTo(points[0][0], points[0][1]);
+      for (let i = 1; i < points.length; i++) ctx.lineTo(points[i][0], points[i][1]);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+
+    function drawArrow(cx, cy, radius, dir) {
+      const angle = (Math.PI / 180) * (dir * 60 + 90);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.scale(radius / 40, radius / 40);
+      ctx.beginPath();
+      ctx.moveTo(0, -16);
+      ctx.lineTo(13, -2);
+      ctx.lineTo(6, -2);
+      ctx.lineTo(6, 14);
+      ctx.lineTo(-6, 14);
+      ctx.lineTo(-6, -2);
+      ctx.lineTo(-13, -2);
+      ctx.closePath();
+      ctx.fillStyle = '#f2f2f2';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.24)';
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function renderLevel(level) {
+      const radius = Number(sizeInput.value) || 42;
+      const sqrt3 = Math.sqrt(3);
+      const margin = radius * 2;
+      const cellCenters = level.Cells.map(c => {
+        const x = margin + radius * sqrt3 * (c.X + 0.5 * (c.Y & 1));
+        const boardHeight = Number(level.Height ?? 0);
+        const yIndex = boardHeight > 0 ? (boardHeight - 1 - c.Y) : c.Y;
+        const y = margin + radius * 1.5 * yIndex;
+        return { ...c, cx: x, cy: y };
+      });
+
+      const maxX = Math.max(...cellCenters.map(c => c.cx), 0) + margin;
+      const maxY = Math.max(...cellCenters.map(c => c.cy), 0) + margin;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.ceil(maxX * dpr);
+      canvas.height = Math.ceil(maxY * dpr);
+      canvas.style.width = `${Math.ceil(maxX)}px`;
+      canvas.style.height = `${Math.ceil(maxY)}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, maxX, maxY);
+
+      for (const c of cellCenters) {
+        for (let layer = 3; layer >= 1; layer--) {
+          const shadowHex = hexPoints(c.cx, c.cy + layer * 3.2, radius);
+          drawPolygon(shadowHex, 'rgba(95, 70, 25, .16)', 'rgba(80, 60, 20, .2)');
+        }
+      }
+
+      for (const c of cellCenters) {
+        const color = colorByHeight(c.Y, Number(level.Height ?? 0));
+        drawPolygon(hexPoints(c.cx, c.cy, radius), color);
+        drawArrow(c.cx, c.cy, radius, c.Direction);
+      }
+    }
+
+    function parseAndRender() {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) throw new Error('Поле Cells должно быть массивом.');
+        error.textContent = '';
+        renderLevel(level);
+      } catch (e) {
+        error.textContent = `Ошибка: ${e.message}`;
+      }
+    }
+
+    document.getElementById('renderBtn').addEventListener('click', parseAndRender);
+    window.addEventListener('resize', parseAndRender);
+    parseAndRender();
+  </script>
+</body>
+</html>
