@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hex Level Viewer</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #d9d9d9;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-height: 100vh;
+    }
+    header {
+      padding: 12px 16px;
+      background: #fff;
+      border-bottom: 1px solid #ccc;
+    }
+    textarea {
+      width: min(1100px, 100%);
+      min-height: 160px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    button {
+      margin-top: 8px;
+      padding: 8px 14px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .error { color: #b00020; font-size: 13px; min-height: 18px; }
+    main { padding: 12px; overflow: auto; }
+    canvas { background: #d9d9d9; display: block; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <div><strong>Визуализатор hex-уровней</strong></div>
+    <textarea id="jsonInput"></textarea>
+    <br />
+    <button id="renderBtn">Отрисовать</button>
+    <div id="error" class="error"></div>
+  </header>
+  <main>
+    <canvas id="canvas"></canvas>
+  </main>
+
+  <script>
+    const sampleLevel = {"Width":7,"Height":6,"Cells":[{"Direction":5,"X":3,"Y":0,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":2,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":3,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":1,"X":4,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":1,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":2,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":3,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":4,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":5,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":3,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":1,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":2,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":3,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":6,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":4,"X":1,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":0,"X":2,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":3,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":5,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":6,"Y":4,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":1,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":5,"X":2,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":4,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}}]};
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const input = document.getElementById('jsonInput');
+    const error = document.getElementById('error');
+    const renderBtn = document.getElementById('renderBtn');
+
+    input.value = JSON.stringify(sampleLevel, null, 2);
+
+    const HEX_SIZE = 40;
+    const SQRT3 = Math.sqrt(3);
+    const HEX_WIDTH = SQRT3 * HEX_SIZE;
+    const VERT_STEP = 1.5 * HEX_SIZE;
+
+    function rgba(c) {
+      return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`;
+    }
+
+    function hexCenter(x, y) {
+      const cx = x * HEX_WIDTH;
+      const cy = y * VERT_STEP - ((x % 2) ? VERT_STEP / 2 : 0);
+      return { x: cx, y: cy };
+    }
+
+    function drawHex(cx, cy, size, fill) {
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        const px = cx + size * Math.cos(angle);
+        const py = cy + size * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.25)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+
+    function drawArrow(cx, cy, dir) {
+      const angle = ((dir % 6) * 60 - 90) * Math.PI / 180;
+      const len = HEX_SIZE * 0.55;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+
+      ctx.beginPath();
+      ctx.moveTo(0, -len * 0.55);
+      ctx.lineTo(len * 0.22, len * 0.05);
+      ctx.lineTo(len * 0.08, len * 0.05);
+      ctx.lineTo(len * 0.08, len * 0.50);
+      ctx.lineTo(-len * 0.08, len * 0.50);
+      ctx.lineTo(-len * 0.08, len * 0.05);
+      ctx.lineTo(-len * 0.22, len * 0.05);
+      ctx.closePath();
+
+      ctx.fillStyle = '#f2f2f2';
+      ctx.strokeStyle = '#8a8a8a';
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function render(level) {
+      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
+      const minX = Math.min(...centers.map(c => c.center.x));
+      const minY = Math.min(...centers.map(c => c.center.y));
+      const maxX = Math.max(...centers.map(c => c.center.x));
+      const maxY = Math.max(...centers.map(c => c.center.y));
+
+      const pad = HEX_SIZE + 20;
+      canvas.width = Math.ceil((maxX - minX) + pad * 2 + HEX_SIZE);
+      canvas.height = Math.ceil((maxY - minY) + pad * 2 + HEX_SIZE);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      centers.forEach(c => {
+        const cx = c.center.x - minX + pad;
+        const cy = c.center.y - minY + pad;
+        drawHex(cx, cy, HEX_SIZE, rgba(c.Color));
+        drawArrow(cx, cy, c.Direction ?? 0);
+      });
+    }
+
+    function safeRender() {
+      try {
+        error.textContent = '';
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) {
+          throw new Error('В JSON отсутствует массив Cells.');
+        }
+        render(level);
+      } catch (e) {
+        error.textContent = `Ошибка: ${e.message}`;
+      }
+    }
+
+    renderBtn.addEventListener('click', safeRender);
+    safeRender();
+  </script>
+</body>
+</html>
