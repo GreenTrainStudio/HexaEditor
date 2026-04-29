@@ -33,7 +33,8 @@
       cursor: pointer;
     }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
-    main { padding: 12px; overflow: auto; }
+    main { padding: 12px; overflow: auto; cursor: grab; }
+    main.dragging { cursor: grabbing; user-select: none; }
     canvas { background: #d9d9d9; display: block; margin: 0 auto; }
   </style>
 </head>
@@ -63,6 +64,7 @@
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const zoomLabel = document.getElementById('zoomLabel');
+    const viewport = document.querySelector('main');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
 
@@ -183,9 +185,41 @@
       }
     }
 
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragStartScrollLeft = 0;
+    let dragStartScrollTop = 0;
+
+    function startDrag(event) {
+      isDragging = true;
+      dragStartX = event.clientX;
+      dragStartY = event.clientY;
+      dragStartScrollLeft = viewport.scrollLeft;
+      dragStartScrollTop = viewport.scrollTop;
+      viewport.classList.add('dragging');
+    }
+
+    function moveDrag(event) {
+      if (!isDragging) return;
+      const dx = event.clientX - dragStartX;
+      const dy = event.clientY - dragStartY;
+      viewport.scrollLeft = dragStartScrollLeft - dx;
+      viewport.scrollTop = dragStartScrollTop - dy;
+    }
+
+    function stopDrag() {
+      isDragging = false;
+      viewport.classList.remove('dragging');
+    }
+
     renderBtn.addEventListener('click', safeRender);
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP));
+    viewport.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', stopDrag);
+    viewport.addEventListener('mouseleave', stopDrag);
     applyZoom();
     safeRender();
   </script>
