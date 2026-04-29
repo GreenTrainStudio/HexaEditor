@@ -90,11 +90,14 @@
       return `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`;
     }
 
-    // World coordinates: (0,0) is bottom-left, X grows to the right, Y grows upward
-    function axialToPixel(q, r, size) {
+    // Double-height horizontal coordinates (pointy hexes):
+    // (0,0) is bottom-left, X grows left->right, Y grows bottom->top.
+    // Odd columns are shifted UP (as requested).
+    function doubleHeightToPixel(x, y, size) {
+      const colShiftUp = (x % 2) ? 0.75 * size : 0;
       return {
-        x: size * SQRT3 * (q + r / 2),
-        y: -size * 1.5 * r,
+        x: x * (SQRT3 * size * 0.5),
+        y: -(y * (size * 0.75) + colShiftUp),
       };
     }
 
@@ -135,7 +138,7 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const hexSize = 36;
-      const centers = level.Cells.map(c => ({ cell: c, ...axialToPixel(c.X, c.Y, hexSize) }));
+      const centers = level.Cells.map(c => ({ cell: c, ...doubleHeightToPixel(c.X, c.Y, hexSize) }));
       if (!centers.length) return;
 
       const minX = Math.min(...centers.map(c => c.x));
