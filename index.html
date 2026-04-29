@@ -48,6 +48,7 @@
     <button id="zoomOutBtn" type="button">−</button>
     <button id="zoomInBtn" type="button">+</button>
     <span id="zoomLabel">Масштаб: 100%</span>
+    <span id="addModeLabel">Режим добавления: выкл (клавиша A)</span>
     <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
     <div id="error" class="error"></div>
   </header>
@@ -66,6 +67,7 @@
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const zoomLabel = document.getElementById('zoomLabel');
+    const addModeLabel = document.getElementById('addModeLabel');
     const deleteModeLabel = document.getElementById('deleteModeLabel');
     const viewport = document.querySelector('main');
 
@@ -248,7 +250,14 @@
     }
 
     let isDeleteMode = false;
+    let isAddMode = false;
     const undoStack = [];
+
+    function updateAddModeLabel() {
+      addModeLabel.textContent = `Режим добавления: ${isAddMode ? 'вкл' : 'выкл'} (клавиша A)`;
+      addModeLabel.style.color = isAddMode ? '#00695c' : '';
+      addModeLabel.style.fontWeight = isAddMode ? '700' : '400';
+    }
 
     function updateDeleteModeLabel() {
       deleteModeLabel.textContent = `Режим удаления: ${isDeleteMode ? 'вкл' : 'выкл'} (клавиша D)`;
@@ -277,6 +286,38 @@
       return null;
     }
 
+    function getGridCellByCanvasPoint(clientX, clientY, level) {
+      const rect = viewport.getBoundingClientRect();
+      const px = (clientX - rect.left - panX) / currentZoom;
+      const py = (clientY - rect.top - panY) / currentZoom;
+
+      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
+      const minX = Math.min(...centers.map(c => c.center.x));
+      const maxY = Math.max(...centers.map(c => c.center.y));
+      const pad = HEX_SIZE + 20;
+
+      let best = null;
+      let bestDist = Number.POSITIVE_INFINITY;
+
+      for (let x = 0; x < (level.Width ?? 0); x++) {
+        for (let y = 0; y < (level.Height ?? 0); y++) {
+          const world = hexCenter(x, y);
+          const cx = world.x - minX + pad;
+          const cy = (maxY - world.y) + pad;
+          const dx = px - cx;
+          const dy = py - cy;
+          const dist = dx * dx + dy * dy;
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = { x, y };
+          }
+        }
+      }
+
+      if (best && bestDist <= HEX_SIZE * HEX_SIZE) return best;
+      return null;
+    }
+
     function deleteCellAt(clientX, clientY) {
       try {
         const level = JSON.parse(input.value);
@@ -299,9 +340,91 @@
       }
     }
 
+    function getNeighborCoords(x, y) {
+      const isOddColumn = x % 2 !== 0;
+      if (isOddColumn) {
+        return [
+          { x: x - 1, y: y + 1 },
+          { x: x, y: y + 1 },
+          { x: x + 1, y: y + 1 },
+          { x: x - 1, y },
+          { x: x + 1, y },
+          { x: x, y: y - 1 }
+        ];
+      }
+      return [
+        { x: x, y: y + 1 },
+        { x: x - 1, y },
+        { x: x + 1, y },
+        { x: x, y: y - 1 },
+        { x: x - 1, y: y - 1 },
+        { x: x + 1, y: y - 1 }
+      ];
+    }
+
+    function getAverageNeighborColor(level, x, y) {
+      const neighbors = getNeighborCoords(x, y)
+        .map(pos => level.Cells.find(c => c.X === pos.x && c.Y === pos.y))
+        .filter(Boolean);
+
+      if (!neighbors.length) {
+        return { r: 200, g: 200, b: 200, a: 255 };
+      }
+
+      const sum = neighbors.reduce((acc, cell) => {
+        const color = cell.Color ?? { r: 0, g: 0, b: 0, a: 255 };
+        acc.r += color.r ?? 0;
+        acc.g += color.g ?? 0;
+        acc.b += color.b ?? 0;
+        acc.a += color.a ?? 255;
+        return acc;
+      }, { r: 0, g: 0, b: 0, a: 0 });
+
+      return {
+        r: Math.round(sum.r / neighbors.length),
+        g: Math.round(sum.g / neighbors.length),
+        b: Math.round(sum.b / neighbors.length),
+        a: Math.round(sum.a / neighbors.length)
+      };
+    }
+
+    function addCellAt(clientX, clientY) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const target = getGridCellByCanvasPoint(clientX, clientY, level);
+        if (!target) return;
+        const exists = level.Cells.some(c => c.X === target.X && c.Y === target.Y);
+        if (exists) return;
+        undoStack.push(JSON.stringify(level));
+        const color = getAverageNeighborColor(level, target.X, target.Y);
+        level.Cells.push({
+          X: target.X,
+          Y: target.Y,
+          Direction: 0,
+          Color: color
+        });
+        writeLevel(level);
+        safeRender();
+      } catch {
+        // Ignore invalid JSON while editing.
+      }
+    }
+
     window.addEventListener('keydown', (event) => {
+      if (event.code === 'KeyA' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        isAddMode = !isAddMode;
+        if (isAddMode) isDeleteMode = false;
+        updateAddModeLabel();
+        updateDeleteModeLabel();
+        event.preventDefault();
+        return;
+      }
+
       if (event.code === 'KeyD' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
         isDeleteMode = !isDeleteMode;
+        if (isDeleteMode) isAddMode = false;
+        updateAddModeLabel();
         updateDeleteModeLabel();
         event.preventDefault();
         return;
@@ -338,8 +461,14 @@
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
     canvas.addEventListener('click', (event) => {
-      if (!isDeleteMode || isSpacePressed || isDragging) return;
-      deleteCellAt(event.clientX, event.clientY);
+      if (isSpacePressed || isDragging) return;
+      if (isDeleteMode) {
+        deleteCellAt(event.clientX, event.clientY);
+        return;
+      }
+      if (isAddMode) {
+        addCellAt(event.clientX, event.clientY);
+      }
     });
     viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
     window.addEventListener('mousemove', moveDrag);
@@ -349,6 +478,7 @@
       stopDrag();
       updatePanModeVisual();
     });
+    updateAddModeLabel();
     updateDeleteModeLabel();
     applyZoom();
     safeRender();
