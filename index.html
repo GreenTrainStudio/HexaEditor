@@ -188,6 +188,12 @@
       }
     }
 
+    function handleWheelZoom(event) {
+      event.preventDefault();
+      const wheelDirection = event.deltaY < 0 ? 1 : -1;
+      changeZoom(wheelDirection * ZOOM_STEP);
+    }
+
     let isDragging = false;
     let isSpacePressed = false;
     let dragStartX = 0;
@@ -245,6 +251,7 @@
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP));
     viewport.addEventListener('mousedown', startDrag);
+    viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
     window.addEventListener('mousemove', moveDrag);
     window.addEventListener('mouseup', stopDrag);
     window.addEventListener('blur', () => {
