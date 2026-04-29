@@ -48,6 +48,7 @@
     <button id="zoomOutBtn" type="button">−</button>
     <button id="zoomInBtn" type="button">+</button>
     <span id="zoomLabel">Масштаб: 100%</span>
+    <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
     <div id="error" class="error"></div>
   </header>
   <main>
@@ -65,6 +66,7 @@
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const zoomLabel = document.getElementById('zoomLabel');
+    const deleteModeLabel = document.getElementById('deleteModeLabel');
     const viewport = document.querySelector('main');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
@@ -163,6 +165,10 @@
       }
     }
 
+    function writeLevel(level) {
+      input.value = JSON.stringify(level, null, 2);
+    }
+
     function updateZoomLabel() {
       zoomLabel.textContent = `Масштаб: ${Math.round(currentZoom * 100)}%`;
     }
@@ -241,7 +247,76 @@
       viewport.classList.toggle('space-held', isSpacePressed && !isDragging);
     }
 
+    let isDeleteMode = false;
+    const undoStack = [];
+
+    function updateDeleteModeLabel() {
+      deleteModeLabel.textContent = `Режим удаления: ${isDeleteMode ? 'вкл' : 'выкл'} (клавиша D)`;
+      deleteModeLabel.style.color = isDeleteMode ? '#b00020' : '';
+      deleteModeLabel.style.fontWeight = isDeleteMode ? '700' : '400';
+    }
+
+    function getCellByCanvasPoint(clientX, clientY, level) {
+      const rect = viewport.getBoundingClientRect();
+      const px = (clientX - rect.left - panX) / currentZoom;
+      const py = (clientY - rect.top - panY) / currentZoom;
+      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
+      const minX = Math.min(...centers.map(c => c.center.x));
+      const maxY = Math.max(...centers.map(c => c.center.y));
+      const pad = HEX_SIZE + 20;
+      for (const cell of level.Cells) {
+        const world = hexCenter(cell.X, cell.Y);
+        const cx = world.x - minX + pad;
+        const cy = (maxY - world.y) + pad;
+        const dx = px - cx;
+        const dy = py - cy;
+        if ((dx * dx + dy * dy) <= HEX_SIZE * HEX_SIZE) {
+          return cell;
+        }
+      }
+      return null;
+    }
+
+    function deleteCellAt(clientX, clientY) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const target = getCellByCanvasPoint(clientX, clientY, level);
+        if (!target) return;
+        undoStack.push(JSON.stringify(level));
+        const index = level.Cells.findIndex(c =>
+          c.X === target.X &&
+          c.Y === target.Y &&
+          (c.Direction ?? 0) === (target.Direction ?? 0) &&
+          JSON.stringify(c.Color ?? {}) === JSON.stringify(target.Color ?? {})
+        );
+        if (index < 0) return;
+        level.Cells.splice(index, 1);
+        writeLevel(level);
+        safeRender();
+      } catch {
+        // Ignore invalid JSON while editing.
+      }
+    }
+
     window.addEventListener('keydown', (event) => {
+      if (event.code === 'KeyD' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        isDeleteMode = !isDeleteMode;
+        updateDeleteModeLabel();
+        event.preventDefault();
+        return;
+      }
+
+      if ((event.ctrlKey || event.metaKey) && event.code === 'KeyZ') {
+        const previous = undoStack.pop();
+        if (previous) {
+          input.value = previous;
+          safeRender();
+        }
+        event.preventDefault();
+        return;
+      }
+
       if (event.code !== 'Space') return;
       if (!isSpacePressed) {
         isSpacePressed = true;
@@ -262,6 +337,10 @@
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
+    canvas.addEventListener('click', (event) => {
+      if (!isDeleteMode || isSpacePressed || isDragging) return;
+      deleteCellAt(event.clientX, event.clientY);
+    });
     viewport.addEventListener('wheel', handleWheelZoom, { passive: false });
     window.addEventListener('mousemove', moveDrag);
     window.addEventListener('mouseup', stopDrag);
@@ -270,6 +349,7 @@
       stopDrag();
       updatePanModeVisual();
     });
+    updateDeleteModeLabel();
     applyZoom();
     safeRender();
   </script>
