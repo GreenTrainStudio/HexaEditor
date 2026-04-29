@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hexa Level Viewer</title>
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: #ececec; }
+    .layout { display: grid; grid-template-columns: 360px 1fr; min-height: 100vh; }
+    .panel { padding: 16px; background: #fff; box-shadow: 2px 0 8px rgba(0,0,0,.08); }
+    textarea { width: 100%; height: 55vh; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+    button { margin-top: 10px; padding: 10px 14px; border: 0; border-radius: 8px; background: #2e77ff; color: #fff; cursor: pointer; }
+    button:hover { background: #1e62df; }
+    .error { margin-top: 10px; color: #b00020; min-height: 20px; }
+    #canvasWrap { overflow: auto; padding: 12px; }
+    canvas { background: #d8d8d8; border-radius: 8px; display: block; margin: 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="panel">
+      <h2>Hex Level JSON</h2>
+      <textarea id="jsonInput"></textarea>
+      <div>
+        <button id="renderBtn">Визуализировать</button>
+      </div>
+      <div class="error" id="error"></div>
+      <p>Координата (0,0) находится внизу слева. Чётные ряды (Y = 0,2,4...) смещаются вверх на 0.5 шага.</p>
+    </aside>
+    <main id="canvasWrap">
+      <canvas id="levelCanvas" width="900" height="700"></canvas>
+    </main>
+  </div>
+
+  <script>
+    const sample = {"Width":7,"Height":6,"Cells":[{"Direction":5,"X":3,"Y":0,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":2,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":3,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":1,"X":4,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":1,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":2,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":3,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":4,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":5,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":3,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":1,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":2,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":3,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":6,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":4,"X":1,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":0,"X":2,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":3,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":5,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":6,"Y":4,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":1,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":5,"X":2,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":4,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}}]};
+
+    const textarea = document.getElementById('jsonInput');
+    const errorEl = document.getElementById('error');
+    const canvas = document.getElementById('levelCanvas');
+    const ctx = canvas.getContext('2d');
+    textarea.value = JSON.stringify(sample, null, 2);
+
+    function hexPoints(cx, cy, size) {
+      const pts = [];
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i - 30);
+        pts.push({x: cx + size * Math.cos(angle), y: cy + size * Math.sin(angle)});
+      }
+      return pts;
+    }
+
+    function drawHex(cx, cy, size, fill) {
+      const pts = hexPoints(cx, cy, size);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.2)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    function draw(level) {
+      const margin = 40;
+      const size = 32;
+      const dx = Math.sqrt(3) * size;
+      const dy = 1.5 * size;
+
+      const totalW = (level.Width - 1) * dx + Math.sqrt(3) * size;
+      const totalH = (level.Height - 1) * dy + 2 * size + 0.5 * dy;
+      canvas.width = Math.max(500, Math.ceil(totalW + margin * 2));
+      canvas.height = Math.max(500, Math.ceil(totalH + margin * 2));
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#d8d8d8';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (const cell of level.Cells || []) {
+        const offset = cell.Y % 2 === 0 ? 0.5 * dy : 0;
+        const cx = margin + cell.X * dx + (Math.sqrt(3) * size / 2);
+        const cyBottomOrigin = margin + cell.Y * dy + size + offset;
+        const cy = canvas.height - cyBottomOrigin;
+        const c = cell.Color || {r: 200, g: 200, b: 200, a: 255};
+        drawHex(cx, cy, size, `rgba(${c.r}, ${c.g}, ${c.b}, ${(c.a ?? 255) / 255})`);
+      }
+    }
+
+    function renderFromInput() {
+      errorEl.textContent = '';
+      try {
+        const level = JSON.parse(textarea.value);
+        if (!Array.isArray(level.Cells)) throw new Error('Поле Cells должно быть массивом');
+        draw(level);
+      } catch (e) {
+        errorEl.textContent = `Ошибка: ${e.message}`;
+      }
+    }
+
+    document.getElementById('renderBtn').addEventListener('click', renderFromInput);
+    renderFromInput();
+  </script>
+</body>
+</html>
