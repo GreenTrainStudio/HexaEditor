@@ -97,6 +97,7 @@
         <button id="rotateModeLabel" class="mode-btn" type="button">Режим вращения: выкл (клавиша R)</button>
         <button id="colorModeLabel" class="mode-btn" type="button">Режим цвета: выкл (клавиша C)</button>
         <button id="eyedropperModeLabel" class="mode-btn" type="button">Режим пипетки: выкл (клавиша E)</button>
+        <button id="inspectModeLabel" class="mode-btn" type="button">Режим информации: выкл (клавиша I)</button>
       </div>
       <div id="error" class="error"></div>
     </aside>
@@ -112,6 +113,7 @@
         </div>
         <label>HEX <input id="pickerHex" type="text" placeholder="#RRGGBB" /></label>
       </div>
+      <div id="hexInfoPopup" class="color-picker-popup"></div>
     </main>
   </div>
 
@@ -132,12 +134,14 @@
     const rotateModeLabel = document.getElementById('rotateModeLabel');
     const colorModeLabel = document.getElementById('colorModeLabel');
     const eyedropperModeLabel = document.getElementById('eyedropperModeLabel');
+    const inspectModeLabel = document.getElementById('inspectModeLabel');
     const colorPickerPopup = document.getElementById('colorPickerPopup');
     const pickerColor = document.getElementById('pickerColor');
     const pickerR = document.getElementById('pickerR');
     const pickerG = document.getElementById('pickerG');
     const pickerB = document.getElementById('pickerB');
     const pickerHex = document.getElementById('pickerHex');
+    const hexInfoPopup = document.getElementById('hexInfoPopup');
     const viewport = document.querySelector('main');
 
     input.value = JSON.stringify(sampleLevel, null, 2);
@@ -352,6 +356,7 @@
     let isRotateMode = false;
     let isColorMode = false;
     let isEyedropperMode = false;
+    let isInspectMode = false;
     let activeColorCell = null;
     let eyedropperTargetCell = null;
     const undoStack = [];
@@ -363,6 +368,7 @@
         rotate: mode === 'rotate' ? !isRotateMode : false,
         color: mode === 'color' ? !isColorMode : false,
         eyedropper: mode === 'eyedropper' ? !isEyedropperMode : false,
+        inspect: mode === 'inspect' ? !isInspectMode : false,
       };
 
       isDeleteMode = nextState.delete;
@@ -370,15 +376,18 @@
       isRotateMode = nextState.rotate;
       isColorMode = nextState.color;
       isEyedropperMode = nextState.eyedropper;
+      isInspectMode = nextState.inspect;
 
       if (!isColorMode) hideColorPicker();
       if (!isEyedropperMode) eyedropperTargetCell = null;
+      if (!isInspectMode) hideHexInfoPopup();
 
       updateDeleteModeLabel();
       updateAddModeLabel();
       updateRotateModeLabel();
       updateColorModeLabel();
       updateEyedropperModeLabel();
+      updateInspectModeLabel();
     }
 
     function updateDeleteModeLabel() {
@@ -586,6 +595,44 @@
       eyedropperModeLabel.style.fontWeight = isEyedropperMode ? '700' : '400';
     }
 
+    function updateInspectModeLabel() {
+      inspectModeLabel.textContent = `Режим информации: ${isInspectMode ? 'вкл' : 'выкл'} (клавиша I)`;
+      inspectModeLabel.style.color = isInspectMode ? '#005b96' : '';
+      inspectModeLabel.style.fontWeight = isInspectMode ? '700' : '400';
+    }
+
+    function hideHexInfoPopup() {
+      hexInfoPopup.style.display = 'none';
+      hexInfoPopup.innerHTML = '';
+    }
+
+    function showHexInfoPopup(clientX, clientY) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const cell = getCellByCanvasPoint(clientX, clientY, level);
+        if (!cell) {
+          hideHexInfoPopup();
+          return;
+        }
+        const color = cell.Color ?? { r: 180, g: 180, b: 180, a: 255 };
+        const hex = rgbToHex(color.r ?? 0, color.g ?? 0, color.b ?? 0);
+        hexInfoPopup.innerHTML = `
+          <div style="font-weight:700;margin-bottom:6px;">Информация о гексе</div>
+          <div>X: <strong>${cell.X}</strong></div>
+          <div>Y: <strong>${cell.Y}</strong></div>
+          <div>Direction: <strong>${cell.Direction ?? 0}</strong></div>
+          <div>RGB: <strong>${color.r ?? 0}, ${color.g ?? 0}, ${color.b ?? 0}</strong></div>
+          <div>HEX: <strong>${hex}</strong></div>
+          <div>A: <strong>${color.a ?? 255}</strong></div>
+        `;
+        const rect = viewport.getBoundingClientRect();
+        hexInfoPopup.style.left = `${Math.min(clientX - rect.left + 12, rect.width - 230)}px`;
+        hexInfoPopup.style.top = `${Math.min(clientY - rect.top + 12, rect.height - 190)}px`;
+        hexInfoPopup.style.display = 'block';
+      } catch {}
+    }
+
     function handleEyedropperClick(clientX, clientY) {
       try {
         const level = JSON.parse(input.value);
@@ -707,6 +754,11 @@
         event.preventDefault();
         return;
       }
+      if (event.code === 'KeyI' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        setExclusiveMode('inspect');
+        event.preventDefault();
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyZ') {
         const previous = undoStack.pop();
@@ -741,6 +793,7 @@
     rotateModeLabel.addEventListener('click', () => setExclusiveMode('rotate'));
     colorModeLabel.addEventListener('click', () => setExclusiveMode('color'));
     eyedropperModeLabel.addEventListener('click', () => setExclusiveMode('eyedropper'));
+    inspectModeLabel.addEventListener('click', () => setExclusiveMode('inspect'));
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
@@ -762,6 +815,10 @@
         handleEyedropperClick(event.clientX, event.clientY);
         return;
       }
+      if (isInspectMode) {
+        showHexInfoPopup(event.clientX, event.clientY);
+        return;
+      }
       if (!isDeleteMode) return;
       deleteCellAt(event.clientX, event.clientY);
     });
@@ -777,6 +834,8 @@
     updateAddModeLabel();
     updateRotateModeLabel();
     updateColorModeLabel();
+    updateEyedropperModeLabel();
+    updateInspectModeLabel();
 
     pickerColor.addEventListener('input', () => {
       const rgb = hexToRgb(pickerColor.value);
@@ -804,6 +863,7 @@
 
     viewport.addEventListener('mousedown', (event) => {
       if (colorPickerPopup.style.display === 'block' && !colorPickerPopup.contains(event.target)) hideColorPicker();
+      if (hexInfoPopup.style.display === 'block' && !hexInfoPopup.contains(event.target)) hideHexInfoPopup();
     });
 
     applyZoom();
