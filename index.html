@@ -341,6 +341,33 @@
       deleteModeLabel.style.fontWeight = isDeleteMode ? '700' : '400';
     }
 
+    function setExclusiveMode(mode) {
+      const shouldEnable = mode === 'delete' ? !isDeleteMode
+        : mode === 'add' ? !isAddMode
+        : mode === 'rotate' ? !isRotateMode
+        : !isColorMode;
+
+      isDeleteMode = false;
+      isAddMode = false;
+      isRotateMode = false;
+      isColorMode = false;
+
+      if (shouldEnable) {
+        if (mode === 'delete') isDeleteMode = true;
+        if (mode === 'add') isAddMode = true;
+        if (mode === 'rotate') isRotateMode = true;
+        if (mode === 'color') isColorMode = true;
+      } else if (mode === 'color') {
+        hideColorPicker();
+      }
+
+      if (!isColorMode) hideColorPicker();
+      updateDeleteModeLabel();
+      updateAddModeLabel();
+      updateRotateModeLabel();
+      updateColorModeLabel();
+    }
+
     function getCellByCanvasPoint(clientX, clientY, level) {
       const rect = viewport.getBoundingClientRect();
       const px = (clientX - rect.left - panX) / currentZoom;
