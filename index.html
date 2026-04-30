@@ -76,6 +76,7 @@
     .rgb-row { display:flex; gap:6px; }
     main.space-held { cursor: grab; }
     main.dragging { cursor: grabbing; user-select: none; }
+    main.eyedropper-pick-source { cursor: copy; }
     canvas { background: #d9d9d9; display: block; margin: 0; }
   </style>
 </head>
@@ -226,6 +227,7 @@
         drawArrow(cx, cy, c.Direction ?? 0);
       });
       drawInspectSelection(level);
+      drawEyedropperTargetSelection(level);
     }
 
     function centerLevelInViewport() {
@@ -352,6 +354,10 @@
       viewport.classList.toggle('space-held', isSpacePressed && !isDragging);
     }
 
+    function updateEyedropperCursor() {
+      viewport.classList.toggle('eyedropper-pick-source', isEyedropperMode && Boolean(eyedropperTargetCell));
+    }
+
     let isDeleteMode = false;
     let isAddMode = false;
     let isRotateMode = false;
@@ -389,6 +395,7 @@
       updateRotateModeLabel();
       updateColorModeLabel();
       updateEyedropperModeLabel();
+      updateEyedropperCursor();
       updateInspectModeLabel();
     }
 
@@ -453,6 +460,36 @@
       ctx.strokeStyle = '#1f6feb';
       ctx.lineWidth = 3;
       ctx.stroke();
+    }
+
+
+    function drawEyedropperTargetSelection(level) {
+      if (!isEyedropperMode || !eyedropperTargetCell || !Array.isArray(level.Cells) || level.Cells.length === 0) return;
+      const exists = level.Cells.some(c => c.X === eyedropperTargetCell.X && c.Y === eyedropperTargetCell.Y);
+      if (!exists) {
+        eyedropperTargetCell = null;
+        updateEyedropperModeLabel();
+        updateEyedropperCursor();
+        return;
+      }
+      const { minX, maxY, pad } = getLevelBounds(level);
+      const world = hexCenter(eyedropperTargetCell.X, eyedropperTargetCell.Y);
+      const cx = world.x - minX + pad;
+      const cy = (maxY - world.y) + pad;
+
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i);
+        const px = cx + (HEX_SIZE + 5) * Math.cos(angle);
+        const py = cy + (HEX_SIZE + 5) * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#8a5a00';
+      ctx.lineWidth = 4;
+      ctx.setLineDash([7, 5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     function getLevelBounds(level) {
@@ -689,6 +726,8 @@
           eyedropperTargetCell = { X: cell.X, Y: cell.Y };
           error.textContent = 'Пипетка: гекс для перекраски выбран. Теперь кликните по источнику цвета.';
           updateEyedropperModeLabel();
+          updateEyedropperCursor();
+          safeRender();
           return;
         }
 
@@ -696,6 +735,8 @@
         if (targetIndex < 0) {
           eyedropperTargetCell = null;
           updateEyedropperModeLabel();
+          updateEyedropperCursor();
+          safeRender();
           return;
         }
 
@@ -713,6 +754,7 @@
         error.textContent = 'Пипетка: гекс перекрашен цветом источника.';
         eyedropperTargetCell = null;
         updateEyedropperModeLabel();
+        updateEyedropperCursor();
       } catch {}
     }
 
@@ -880,6 +922,7 @@
     updateRotateModeLabel();
     updateColorModeLabel();
     updateEyedropperModeLabel();
+    updateEyedropperCursor();
     updateInspectModeLabel();
 
     pickerColor.addEventListener('input', () => {
