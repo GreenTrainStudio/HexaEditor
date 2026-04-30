@@ -402,21 +402,32 @@
       const rect = viewport.getBoundingClientRect();
       const px = (clientX - rect.left - panX) / currentZoom;
       const py = (clientY - rect.top - panY) / currentZoom;
-      const centers = level.Cells.map(c => ({ ...c, center: hexCenter(c.X, c.Y) }));
-      const minX = Math.min(...centers.map(c => c.center.x));
-      const maxY = Math.max(...centers.map(c => c.center.y));
-      const pad = HEX_SIZE + 20;
+      const { minX, maxY, pad } = getLevelBounds(level);
+      let bestCell = null;
+      let bestDist = Infinity;
       for (const cell of level.Cells) {
         const world = hexCenter(cell.X, cell.Y);
         const cx = world.x - minX + pad;
         const cy = (maxY - world.y) + pad;
         const dx = px - cx;
         const dy = py - cy;
-        if ((dx * dx + dy * dy) <= HEX_SIZE * HEX_SIZE) {
-          return cell;
+        if (!isPointInHex(dx, dy, HEX_SIZE)) {
+          continue;
+        }
+        const dist = dx * dx + dy * dy;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestCell = cell;
         }
       }
-      return null;
+      return bestCell;
+    }
+
+    function isPointInHex(localX, localY, size) {
+      const absX = Math.abs(localX);
+      const absY = Math.abs(localY);
+      if (absX > size || absY > (SQRT3 / 2) * size) return false;
+      return (SQRT3 * absX + absY) <= SQRT3 * size;
     }
 
     function drawInspectSelection(level) {
