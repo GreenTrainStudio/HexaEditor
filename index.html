@@ -221,7 +221,13 @@
       });
     }
 
-    function safeRender() {
+    function centerLevelInViewport() {
+      panX = (viewport.clientWidth - canvas.width * currentZoom) / 2;
+      panY = (viewport.clientHeight - canvas.height * currentZoom) / 2;
+      applyZoom();
+    }
+
+    function safeRender(centerInViewport = false) {
       try {
         error.textContent = '';
         const level = JSON.parse(input.value);
@@ -229,6 +235,7 @@
           throw new Error('В JSON отсутствует массив Cells.');
         }
         render(level);
+        if (centerInViewport) centerLevelInViewport();
       } catch (e) {
         error.textContent = `Ошибка: ${e.message}`;
       }
@@ -716,7 +723,7 @@
     });
 
     applyZoom();
-    safeRender();
+    safeRender(true);
   </script>
 </body>
 </html>
