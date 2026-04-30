@@ -462,6 +462,29 @@
       };
     }
 
+    function recalculateLevelBounds(level) {
+      if (!Array.isArray(level.Cells) || level.Cells.length === 0) {
+        level.Width = 0;
+        level.Height = 0;
+        return;
+      }
+
+      const minX = Math.min(...level.Cells.map(c => c.X));
+      const minY = Math.min(...level.Cells.map(c => c.Y));
+      const maxX = Math.max(...level.Cells.map(c => c.X));
+      const maxY = Math.max(...level.Cells.map(c => c.Y));
+
+      if (minX !== 0 || minY !== 0) {
+        level.Cells.forEach(cell => {
+          cell.X -= minX;
+          cell.Y -= minY;
+        });
+      }
+
+      level.Width = (maxX - minX) + 1;
+      level.Height = (maxY - minY) + 1;
+    }
+
     function deleteCellAt(clientX, clientY) {
       try {
         const level = JSON.parse(input.value);
@@ -477,6 +500,7 @@
         );
         if (index < 0) return;
         level.Cells.splice(index, 1);
+        recalculateLevelBounds(level);
         writeLevel(level);
         safeRender();
       } catch {
@@ -530,11 +554,7 @@
           Y: target.Y,
           Color: color
         });
-
-        if (typeof level.Width !== 'number') level.Width = 0;
-        if (typeof level.Height !== 'number') level.Height = 0;
-        if (target.X >= level.Width) level.Width = target.X + 1;
-        if (target.Y >= level.Height) level.Height = target.Y + 1;
+        recalculateLevelBounds(level);
 
         writeLevel(level);
         safeRender();
