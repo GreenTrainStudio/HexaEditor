@@ -225,6 +225,7 @@
         drawHex(cx, cy, HEX_SIZE, rgba(c.Color));
         drawArrow(cx, cy, c.Direction ?? 0);
       });
+      drawInspectSelection(level);
     }
 
     function centerLevelInViewport() {
@@ -359,6 +360,7 @@
     let isInspectMode = false;
     let activeColorCell = null;
     let eyedropperTargetCell = null;
+    let selectedInspectCell = null;
     const undoStack = [];
 
     function setExclusiveMode(mode) {
@@ -415,6 +417,31 @@
         }
       }
       return null;
+    }
+
+    function drawInspectSelection(level) {
+      if (!selectedInspectCell || !Array.isArray(level.Cells) || level.Cells.length === 0) return;
+      const exists = level.Cells.some(c => c.X === selectedInspectCell.X && c.Y === selectedInspectCell.Y);
+      if (!exists) {
+        selectedInspectCell = null;
+        return;
+      }
+      const { minX, maxY, pad } = getLevelBounds(level);
+      const world = hexCenter(selectedInspectCell.X, selectedInspectCell.Y);
+      const cx = world.x - minX + pad;
+      const cy = (maxY - world.y) + pad;
+
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 180) * (60 * i);
+        const px = cx + (HEX_SIZE + 3) * Math.cos(angle);
+        const py = cy + (HEX_SIZE + 3) * Math.sin(angle);
+        if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#1f6feb';
+      ctx.lineWidth = 3;
+      ctx.stroke();
     }
 
     function getLevelBounds(level) {
@@ -604,6 +631,8 @@
     function hideHexInfoPopup() {
       hexInfoPopup.style.display = 'none';
       hexInfoPopup.innerHTML = '';
+      selectedInspectCell = null;
+      safeRender();
     }
 
     function showHexInfoPopup(clientX, clientY) {
@@ -617,13 +646,18 @@
         }
         const color = cell.Color ?? { r: 180, g: 180, b: 180, a: 255 };
         const hex = rgbToHex(color.r ?? 0, color.g ?? 0, color.b ?? 0);
+        selectedInspectCell = { X: cell.X, Y: cell.Y };
+        safeRender();
         hexInfoPopup.innerHTML = `
           <div style="font-weight:700;margin-bottom:6px;">Информация о гексе</div>
           <div>X: <strong>${cell.X}</strong></div>
           <div>Y: <strong>${cell.Y}</strong></div>
           <div>Direction: <strong>${cell.Direction ?? 0}</strong></div>
           <div>RGB: <strong>${color.r ?? 0}, ${color.g ?? 0}, ${color.b ?? 0}</strong></div>
-          <div>HEX: <strong>${hex}</strong></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span>HEX: <strong>${hex}</strong></span>
+            <span style="display:inline-block;width:14px;height:14px;border:1px solid #777;background:${hex};border-radius:2px;"></span>
+          </div>
           <div>A: <strong>${color.a ?? 255}</strong></div>
         `;
         const rect = viewport.getBoundingClientRect();
