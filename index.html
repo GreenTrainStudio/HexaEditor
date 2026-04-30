@@ -353,7 +353,7 @@
     let isColorMode = false;
     let isEyedropperMode = false;
     let activeColorCell = null;
-    let pickedEyedropperColor = null;
+    let eyedropperTargetCell = null;
     const undoStack = [];
 
     function setExclusiveMode(mode) {
@@ -372,7 +372,7 @@
       isEyedropperMode = nextState.eyedropper;
 
       if (!isColorMode) hideColorPicker();
-      if (!isEyedropperMode) pickedEyedropperColor = null;
+      if (!isEyedropperMode) eyedropperTargetCell = null;
 
       updateDeleteModeLabel();
       updateAddModeLabel();
@@ -580,7 +580,7 @@
 
 
     function updateEyedropperModeLabel() {
-      const status = !isEyedropperMode ? 'выкл' : (pickedEyedropperColor ? 'вкл (цвет выбран)' : 'вкл (выберите источник цвета)');
+      const status = !isEyedropperMode ? 'выкл' : (eyedropperTargetCell ? 'вкл (выберите источник цвета)' : 'вкл (выберите гекс для перекраски)');
       eyedropperModeLabel.textContent = `Режим пипетки: ${status} (клавиша E)`;
       eyedropperModeLabel.style.color = isEyedropperMode ? '#8a5a00' : '';
       eyedropperModeLabel.style.fontWeight = isEyedropperMode ? '700' : '400';
@@ -593,26 +593,33 @@
         const cell = getCellByCanvasPoint(clientX, clientY, level);
         if (!cell) return;
 
-        if (!pickedEyedropperColor) {
-          pickedEyedropperColor = {
-            r: cell.Color?.r ?? 180,
-            g: cell.Color?.g ?? 180,
-            b: cell.Color?.b ?? 180,
-            a: cell.Color?.a ?? 255,
-          };
-          error.textContent = 'Пипетка: цвет выбран. Кликните по гексу для перекраски.';
+        if (!eyedropperTargetCell) {
+          eyedropperTargetCell = { X: cell.X, Y: cell.Y };
+          error.textContent = 'Пипетка: гекс для перекраски выбран. Теперь кликните по источнику цвета.';
           updateEyedropperModeLabel();
           return;
         }
 
-        const index = level.Cells.findIndex(c => c.X === cell.X && c.Y === cell.Y);
-        if (index < 0) return;
+        const targetIndex = level.Cells.findIndex(c => c.X === eyedropperTargetCell.X && c.Y === eyedropperTargetCell.Y);
+        if (targetIndex < 0) {
+          eyedropperTargetCell = null;
+          updateEyedropperModeLabel();
+          return;
+        }
+
+        const sourceColor = {
+          r: cell.Color?.r ?? 180,
+          g: cell.Color?.g ?? 180,
+          b: cell.Color?.b ?? 180,
+          a: cell.Color?.a ?? 255,
+        };
+
         undoStack.push(JSON.stringify(level));
-        level.Cells[index].Color = { ...pickedEyedropperColor };
+        level.Cells[targetIndex].Color = sourceColor;
         writeLevel(level);
         safeRender();
-        error.textContent = 'Пипетка: гекс перекрашен.';
-        pickedEyedropperColor = null;
+        error.textContent = 'Пипетка: гекс перекрашен цветом источника.';
+        eyedropperTargetCell = null;
         updateEyedropperModeLabel();
       } catch {}
     }
