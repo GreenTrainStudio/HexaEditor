@@ -290,6 +290,27 @@
     let activeColorCell = null;
     const undoStack = [];
 
+    function setExclusiveMode(mode) {
+      const nextState = {
+        delete: mode === 'delete' ? !isDeleteMode : false,
+        add: mode === 'add' ? !isAddMode : false,
+        rotate: mode === 'rotate' ? !isRotateMode : false,
+        color: mode === 'color' ? !isColorMode : false,
+      };
+
+      isDeleteMode = nextState.delete;
+      isAddMode = nextState.add;
+      isRotateMode = nextState.rotate;
+      isColorMode = nextState.color;
+
+      if (!isColorMode) hideColorPicker();
+
+      updateDeleteModeLabel();
+      updateAddModeLabel();
+      updateRotateModeLabel();
+      updateColorModeLabel();
+    }
+
     function updateDeleteModeLabel() {
       deleteModeLabel.textContent = `Режим удаления: ${isDeleteMode ? 'вкл' : 'выкл'} (клавиша D)`;
       deleteModeLabel.style.color = isDeleteMode ? '#b00020' : '';
@@ -526,27 +547,22 @@
 
     window.addEventListener('keydown', (event) => {
       if (event.code === 'KeyD' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isDeleteMode = !isDeleteMode;
-        updateDeleteModeLabel();
+        setExclusiveMode('delete');
         event.preventDefault();
         return;
       }
       if (event.code === 'KeyA' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isAddMode = !isAddMode;
-        updateAddModeLabel();
+        setExclusiveMode('add');
         event.preventDefault();
         return;
       }
       if (event.code === 'KeyR' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isRotateMode = !isRotateMode;
-        updateRotateModeLabel();
+        setExclusiveMode('rotate');
         event.preventDefault();
         return;
       }
       if (event.code === 'KeyC' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
-        isColorMode = !isColorMode;
-        if (!isColorMode) hideColorPicker();
-        updateColorModeLabel();
+        setExclusiveMode('color');
         event.preventDefault();
         return;
       }
