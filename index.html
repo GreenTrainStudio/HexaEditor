@@ -96,6 +96,7 @@
         <button id="addModeLabel" class="mode-btn" type="button">Режим добавления: выкл (клавиша A)</button>
         <button id="rotateModeLabel" class="mode-btn" type="button">Режим вращения: выкл (клавиша R)</button>
         <button id="colorModeLabel" class="mode-btn" type="button">Режим цвета: выкл (клавиша C)</button>
+        <button id="eyedropperModeLabel" class="mode-btn" type="button">Режим пипетки: выкл (клавиша E)</button>
       </div>
       <div id="error" class="error"></div>
     </aside>
@@ -130,6 +131,7 @@
     const addModeLabel = document.getElementById('addModeLabel');
     const rotateModeLabel = document.getElementById('rotateModeLabel');
     const colorModeLabel = document.getElementById('colorModeLabel');
+    const eyedropperModeLabel = document.getElementById('eyedropperModeLabel');
     const colorPickerPopup = document.getElementById('colorPickerPopup');
     const pickerColor = document.getElementById('pickerColor');
     const pickerR = document.getElementById('pickerR');
@@ -349,7 +351,9 @@
     let isAddMode = false;
     let isRotateMode = false;
     let isColorMode = false;
+    let isEyedropperMode = false;
     let activeColorCell = null;
+    let pickedEyedropperColor = null;
     const undoStack = [];
 
     function setExclusiveMode(mode) {
@@ -358,19 +362,23 @@
         add: mode === 'add' ? !isAddMode : false,
         rotate: mode === 'rotate' ? !isRotateMode : false,
         color: mode === 'color' ? !isColorMode : false,
+        eyedropper: mode === 'eyedropper' ? !isEyedropperMode : false,
       };
 
       isDeleteMode = nextState.delete;
       isAddMode = nextState.add;
       isRotateMode = nextState.rotate;
       isColorMode = nextState.color;
+      isEyedropperMode = nextState.eyedropper;
 
       if (!isColorMode) hideColorPicker();
+      if (!isEyedropperMode) pickedEyedropperColor = null;
 
       updateDeleteModeLabel();
       updateAddModeLabel();
       updateRotateModeLabel();
       updateColorModeLabel();
+      updateEyedropperModeLabel();
     }
 
     function updateDeleteModeLabel() {
@@ -570,6 +578,45 @@
       colorModeLabel.style.fontWeight = isColorMode ? '700' : '400';
     }
 
+
+    function updateEyedropperModeLabel() {
+      const status = !isEyedropperMode ? 'выкл' : (pickedEyedropperColor ? 'вкл (цвет выбран)' : 'вкл (выберите источник цвета)');
+      eyedropperModeLabel.textContent = `Режим пипетки: ${status} (клавиша E)`;
+      eyedropperModeLabel.style.color = isEyedropperMode ? '#8a5a00' : '';
+      eyedropperModeLabel.style.fontWeight = isEyedropperMode ? '700' : '400';
+    }
+
+    function handleEyedropperClick(clientX, clientY) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const cell = getCellByCanvasPoint(clientX, clientY, level);
+        if (!cell) return;
+
+        if (!pickedEyedropperColor) {
+          pickedEyedropperColor = {
+            r: cell.Color?.r ?? 180,
+            g: cell.Color?.g ?? 180,
+            b: cell.Color?.b ?? 180,
+            a: cell.Color?.a ?? 255,
+          };
+          error.textContent = 'Пипетка: цвет выбран. Кликните по гексу для перекраски.';
+          updateEyedropperModeLabel();
+          return;
+        }
+
+        const index = level.Cells.findIndex(c => c.X === cell.X && c.Y === cell.Y);
+        if (index < 0) return;
+        undoStack.push(JSON.stringify(level));
+        level.Cells[index].Color = { ...pickedEyedropperColor };
+        writeLevel(level);
+        safeRender();
+        error.textContent = 'Пипетка: гекс перекрашен.';
+        pickedEyedropperColor = null;
+        updateEyedropperModeLabel();
+      } catch {}
+    }
+
     function rgbToHex(r, g, b) {
       return '#' + [r, g, b].map(v => Number(v).toString(16).padStart(2, '0')).join('').toUpperCase();
     }
@@ -648,6 +695,11 @@
         event.preventDefault();
         return;
       }
+      if (event.code === 'KeyE' && !event.repeat && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        setExclusiveMode('eyedropper');
+        event.preventDefault();
+        return;
+      }
 
       if ((event.ctrlKey || event.metaKey) && event.code === 'KeyZ') {
         const previous = undoStack.pop();
@@ -681,6 +733,7 @@
     addModeLabel.addEventListener('click', () => setExclusiveMode('add'));
     rotateModeLabel.addEventListener('click', () => setExclusiveMode('rotate'));
     colorModeLabel.addEventListener('click', () => setExclusiveMode('color'));
+    eyedropperModeLabel.addEventListener('click', () => setExclusiveMode('eyedropper'));
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
@@ -696,6 +749,10 @@
       }
       if (isColorMode) {
         openColorPickerForCell(event.clientX, event.clientY);
+        return;
+      }
+      if (isEyedropperMode) {
+        handleEyedropperClick(event.clientX, event.clientY);
         return;
       }
       if (!isDeleteMode) return;
