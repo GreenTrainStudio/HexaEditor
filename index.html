@@ -10,27 +10,53 @@
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       background: #d9d9d9;
-      display: grid;
-      grid-template-rows: auto 1fr;
       min-height: 100vh;
     }
-    header {
+    .app-layout {
+      display: grid;
+      grid-template-columns: minmax(320px, 420px) 1fr;
+      min-height: 100vh;
+    }
+    .ui-panel {
       padding: 12px 16px;
       background: #fff;
-      border-bottom: 1px solid #ccc;
+      border-right: 1px solid #ccc;
+      overflow: auto;
     }
     textarea {
       width: min(1100px, 100%);
-      min-height: 160px;
+      height: 50vh;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 13px;
       margin-top: 8px;
+      box-sizing: border-box;
     }
     button {
       margin-top: 8px;
       padding: 8px 14px;
       font-size: 14px;
       cursor: pointer;
+    }
+    .mode-status {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .mode-btn {
+      text-align: left;
+      margin-top: 0;
+      border: 1px solid #cfcfcf;
+      border-radius: 6px;
+      background: #fafafa;
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
     }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
     main { padding: 12px; overflow: hidden; cursor: default; position: relative; }
@@ -54,34 +80,39 @@
   </style>
 </head>
 <body>
-  <header>
-    <div><strong>Визуализатор hex-уровней</strong></div>
-    <textarea id="jsonInput"></textarea>
-    <br />
-    <button id="renderBtn">Отрисовать</button>
-    <button id="copyJsonBtn" type="button">Копировать JSON</button>
-    <button id="zoomOutBtn" type="button">−</button>
-    <button id="zoomInBtn" type="button">+</button>
-    <span id="zoomLabel">Масштаб: 100%</span>
-    <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
-    <span id="addModeLabel" style="margin-left: 10px;">Режим добавления: выкл (клавиша A)</span>
-    <span id="rotateModeLabel" style="margin-left: 10px;">Режим вращения: выкл (клавиша R)</span>
-    <span id="colorModeLabel" style="margin-left: 10px;">Режим цвета: выкл (клавиша C)</span>
-    <div id="error" class="error"></div>
-  </header>
-  <main>
-    <canvas id="canvas"></canvas>
-    <div id="colorPickerPopup" class="color-picker-popup">
-      <label>Палитра RGB <input id="pickerColor" type="color" /></label>
-      <label>RGB</label>
-      <div class="rgb-row">
-        <input id="pickerR" type="number" min="0" max="255" />
-        <input id="pickerG" type="number" min="0" max="255" />
-        <input id="pickerB" type="number" min="0" max="255" />
+  <div class="app-layout">
+    <aside class="ui-panel">
+      <div><strong>Визуализатор hex-уровней</strong></div>
+      <textarea id="jsonInput"></textarea>
+      <div class="action-row">
+        <button id="renderBtn">Отрисовать</button>
+        <button id="copyJsonBtn" type="button">Копировать JSON</button>
+        <button id="zoomOutBtn" type="button">−</button>
+        <button id="zoomInBtn" type="button">+</button>
+        <span id="zoomLabel">Масштаб: 100%</span>
       </div>
-      <label>HEX <input id="pickerHex" type="text" placeholder="#RRGGBB" /></label>
-    </div>
-  </main>
+      <div class="mode-status">
+        <button id="deleteModeLabel" class="mode-btn" type="button">Режим удаления: выкл (клавиша D)</button>
+        <button id="addModeLabel" class="mode-btn" type="button">Режим добавления: выкл (клавиша A)</button>
+        <button id="rotateModeLabel" class="mode-btn" type="button">Режим вращения: выкл (клавиша R)</button>
+        <button id="colorModeLabel" class="mode-btn" type="button">Режим цвета: выкл (клавиша C)</button>
+      </div>
+      <div id="error" class="error"></div>
+    </aside>
+    <main>
+      <canvas id="canvas"></canvas>
+      <div id="colorPickerPopup" class="color-picker-popup">
+        <label>Палитра RGB <input id="pickerColor" type="color" /></label>
+        <label>RGB</label>
+        <div class="rgb-row">
+          <input id="pickerR" type="number" min="0" max="255" />
+          <input id="pickerG" type="number" min="0" max="255" />
+          <input id="pickerB" type="number" min="0" max="255" />
+        </div>
+        <label>HEX <input id="pickerHex" type="text" placeholder="#RRGGBB" /></label>
+      </div>
+    </main>
+  </div>
 
   <script>
     const sampleLevel = {"Width":7,"Height":6,"Cells":[{"Direction":5,"X":3,"Y":0,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":2,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":3,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":1,"X":4,"Y":1,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":1,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":2,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":3,"Y":2,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":3,"X":4,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":4,"X":5,"Y":2,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":3,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":1,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":2,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":0,"X":3,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":3,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":6,"Y":3,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":5,"X":0,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":4,"X":1,"Y":4,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":0,"X":2,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":4,"X":3,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":4,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":5,"Y":4,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":2,"X":6,"Y":4,"Color":{"r":222,"g":31,"b":30,"a":255}},{"Direction":3,"X":1,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":5,"X":2,"Y":5,"Color":{"r":255,"g":128,"b":15,"a":255}},{"Direction":3,"X":4,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}},{"Direction":5,"X":5,"Y":5,"Color":{"r":255,"g":43,"b":44,"a":255}}]};
@@ -190,7 +221,13 @@
       });
     }
 
-    function safeRender() {
+    function centerLevelInViewport() {
+      panX = (viewport.clientWidth - canvas.width * currentZoom) / 2;
+      panY = (viewport.clientHeight - canvas.height * currentZoom) / 2;
+      applyZoom();
+    }
+
+    function safeRender(centerInViewport = false) {
       try {
         error.textContent = '';
         const level = JSON.parse(input.value);
@@ -198,6 +235,7 @@
           throw new Error('В JSON отсутствует массив Cells.');
         }
         render(level);
+        if (centerInViewport) centerLevelInViewport();
       } catch (e) {
         error.textContent = `Ошибка: ${e.message}`;
       }
@@ -619,6 +657,10 @@
 
     renderBtn.addEventListener('click', safeRender);
     copyJsonBtn.addEventListener('click', copyJsonToClipboard);
+    deleteModeLabel.addEventListener('click', () => setExclusiveMode('delete'));
+    addModeLabel.addEventListener('click', () => setExclusiveMode('add'));
+    rotateModeLabel.addEventListener('click', () => setExclusiveMode('rotate'));
+    colorModeLabel.addEventListener('click', () => setExclusiveMode('color'));
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
@@ -681,7 +723,7 @@
     });
 
     applyZoom();
-    safeRender();
+    safeRender(true);
   </script>
 </body>
 </html>
