@@ -36,6 +36,20 @@
       font-size: 14px;
       cursor: pointer;
     }
+    .mode-status {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
     .error { color: #b00020; font-size: 13px; min-height: 18px; }
     main { padding: 12px; overflow: hidden; cursor: default; position: relative; }
     .color-picker-popup {
@@ -62,16 +76,19 @@
     <aside class="ui-panel">
       <div><strong>Визуализатор hex-уровней</strong></div>
       <textarea id="jsonInput"></textarea>
-      <br />
-      <button id="renderBtn">Отрисовать</button>
-      <button id="copyJsonBtn" type="button">Копировать JSON</button>
-      <button id="zoomOutBtn" type="button">−</button>
-      <button id="zoomInBtn" type="button">+</button>
-      <span id="zoomLabel">Масштаб: 100%</span>
-      <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
-      <span id="addModeLabel" style="margin-left: 10px;">Режим добавления: выкл (клавиша A)</span>
-      <span id="rotateModeLabel" style="margin-left: 10px;">Режим вращения: выкл (клавиша R)</span>
-      <span id="colorModeLabel" style="margin-left: 10px;">Режим цвета: выкл (клавиша C)</span>
+      <div class="action-row">
+        <button id="renderBtn">Отрисовать</button>
+        <button id="copyJsonBtn" type="button">Копировать JSON</button>
+        <button id="zoomOutBtn" type="button">−</button>
+        <button id="zoomInBtn" type="button">+</button>
+        <span id="zoomLabel">Масштаб: 100%</span>
+      </div>
+      <div class="mode-status">
+        <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
+        <span id="addModeLabel">Режим добавления: выкл (клавиша A)</span>
+        <span id="rotateModeLabel">Режим вращения: выкл (клавиша R)</span>
+        <span id="colorModeLabel">Режим цвета: выкл (клавиша C)</span>
+      </div>
       <div id="error" class="error"></div>
     </aside>
     <main>
