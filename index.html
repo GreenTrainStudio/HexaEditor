@@ -839,7 +839,8 @@
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
-    canvas.addEventListener('click', (event) => {
+    canvas.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
       if (isSpacePressed || isDragging) return;
       if (isRotateMode) {
         rotateCellAt(event.clientX, event.clientY);
