@@ -398,6 +398,14 @@
       deleteModeLabel.style.fontWeight = isDeleteMode ? '700' : '400';
     }
 
+    function isPointInsideHex(dx, dy, size) {
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      const halfHeight = (SQRT3 * size) / 2;
+      if (absX > size || absY > halfHeight) return false;
+      return (SQRT3 * absX + absY) <= SQRT3 * size;
+    }
+
     function getCellByCanvasPoint(clientX, clientY, level) {
       const rect = viewport.getBoundingClientRect();
       const px = (clientX - rect.left - panX) / currentZoom;
@@ -412,7 +420,7 @@
         const cy = (maxY - world.y) + pad;
         const dx = px - cx;
         const dy = py - cy;
-        if ((dx * dx + dy * dy) <= HEX_SIZE * HEX_SIZE) {
+        if (isPointInsideHex(dx, dy, HEX_SIZE)) {
           return cell;
         }
       }
