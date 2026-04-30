@@ -43,6 +43,13 @@
       margin-top: 12px;
       font-size: 14px;
     }
+    .mode-btn {
+      text-align: left;
+      margin-top: 0;
+      border: 1px solid #cfcfcf;
+      border-radius: 6px;
+      background: #fafafa;
+    }
     .action-row {
       display: flex;
       flex-wrap: wrap;
@@ -84,10 +91,10 @@
         <span id="zoomLabel">Масштаб: 100%</span>
       </div>
       <div class="mode-status">
-        <span id="deleteModeLabel">Режим удаления: выкл (клавиша D)</span>
-        <span id="addModeLabel">Режим добавления: выкл (клавиша A)</span>
-        <span id="rotateModeLabel">Режим вращения: выкл (клавиша R)</span>
-        <span id="colorModeLabel">Режим цвета: выкл (клавиша C)</span>
+        <button id="deleteModeLabel" class="mode-btn" type="button">Режим удаления: выкл (клавиша D)</button>
+        <button id="addModeLabel" class="mode-btn" type="button">Режим добавления: выкл (клавиша A)</button>
+        <button id="rotateModeLabel" class="mode-btn" type="button">Режим вращения: выкл (клавиша R)</button>
+        <button id="colorModeLabel" class="mode-btn" type="button">Режим цвета: выкл (клавиша C)</button>
       </div>
       <div id="error" class="error"></div>
     </aside>
@@ -642,6 +649,10 @@
 
     renderBtn.addEventListener('click', safeRender);
     copyJsonBtn.addEventListener('click', copyJsonToClipboard);
+    deleteModeLabel.addEventListener('click', () => setExclusiveMode('delete'));
+    addModeLabel.addEventListener('click', () => setExclusiveMode('add'));
+    rotateModeLabel.addEventListener('click', () => setExclusiveMode('rotate'));
+    colorModeLabel.addEventListener('click', () => setExclusiveMode('color'));
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
