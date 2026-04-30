@@ -59,6 +59,7 @@
     <textarea id="jsonInput"></textarea>
     <br />
     <button id="renderBtn">Отрисовать</button>
+    <button id="copyJsonBtn" type="button">Копировать JSON</button>
     <button id="zoomOutBtn" type="button">−</button>
     <button id="zoomInBtn" type="button">+</button>
     <span id="zoomLabel">Масштаб: 100%</span>
@@ -90,6 +91,7 @@
     const input = document.getElementById('jsonInput');
     const error = document.getElementById('error');
     const renderBtn = document.getElementById('renderBtn');
+    const copyJsonBtn = document.getElementById('copyJsonBtn');
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const zoomLabel = document.getElementById('zoomLabel');
@@ -203,6 +205,28 @@
 
     function writeLevel(level) {
       input.value = JSON.stringify(level, null, 2);
+    }
+
+    async function copyJsonToClipboard() {
+      const jsonText = input.value;
+      if (!jsonText.trim()) {
+        error.textContent = 'Ошибка: JSON пустой, нечего копировать.';
+        return;
+      }
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(jsonText);
+        } else {
+          input.focus();
+          input.select();
+          const ok = document.execCommand('copy');
+          input.setSelectionRange(input.value.length, input.value.length);
+          if (!ok) throw new Error('copy command failed');
+        }
+        error.textContent = 'JSON скопирован в буфер обмена.';
+      } catch {
+        error.textContent = 'Ошибка: не удалось скопировать JSON.';
+      }
     }
 
     function updateZoomLabel() {
@@ -594,6 +618,7 @@
     });
 
     renderBtn.addEventListener('click', safeRender);
+    copyJsonBtn.addEventListener('click', copyJsonToClipboard);
     zoomInBtn.addEventListener('click', () => changeZoom(ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     zoomOutBtn.addEventListener('click', () => changeZoom(-ZOOM_STEP, viewport.clientWidth / 2, viewport.clientHeight / 2));
     viewport.addEventListener('mousedown', startDrag);
