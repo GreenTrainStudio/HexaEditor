@@ -96,6 +96,7 @@
         <label for="saturationSlider">Насыщенность уровня:</label>
         <input id="saturationSlider" type="range" min="0" max="200" step="1" value="100" />
         <span id="saturationLabel">100%</span>
+        <button id="setSaturationBaseBtn" type="button">Сделать текущие цвета базовыми</button>
       </div>
       <div class="mode-status">
         <button id="deleteModeLabel" class="mode-btn" type="button">Режим удаления: выкл (клавиша D)</button>
@@ -137,6 +138,7 @@
     const zoomLabel = document.getElementById('zoomLabel');
     const saturationSlider = document.getElementById('saturationSlider');
     const saturationLabel = document.getElementById('saturationLabel');
+    const setSaturationBaseBtn = document.getElementById('setSaturationBaseBtn');
     const deleteModeLabel = document.getElementById('deleteModeLabel');
     const addModeLabel = document.getElementById('addModeLabel');
     const rotateModeLabel = document.getElementById('rotateModeLabel');
@@ -375,6 +377,7 @@
     let eyedropperTargetCell = null;
     let selectedInspectCell = null;
     const undoStack = [];
+    let baseColorSnapshot = null;
 
     function setExclusiveMode(mode) {
       const nextState = {
@@ -826,19 +829,41 @@
       };
     }
 
-    function setLevelSaturation(percent) {
+    function getCellKey(cell) {
+      return `${cell.X}:${cell.Y}`;
+    }
+
+    function rememberBaseColors(level) {
+      if (!Array.isArray(level.Cells)) return;
+      baseColorSnapshot = {};
+      level.Cells.forEach(cell => {
+        baseColorSnapshot[getCellKey(cell)] = {
+          r: cell.Color?.r ?? 0,
+          g: cell.Color?.g ?? 0,
+          b: cell.Color?.b ?? 0,
+          a: cell.Color?.a ?? 255,
+        };
+      });
+    }
+
+    function setLevelSaturationFromBase(percent) {
       try {
         const level = JSON.parse(input.value);
         if (!Array.isArray(level.Cells)) return;
+        if (!baseColorSnapshot) rememberBaseColors(level);
         const factor = Math.max(0, Number(percent) / 100);
         undoStack.push(JSON.stringify(level));
         level.Cells.forEach(cell => {
-          const color = cell.Color;
-          if (!color) return;
-          const hsl = rgbToHsl(color.r ?? 0, color.g ?? 0, color.b ?? 0);
+          const baseColor = baseColorSnapshot?.[getCellKey(cell)] ?? {
+            r: cell.Color?.r ?? 0,
+            g: cell.Color?.g ?? 0,
+            b: cell.Color?.b ?? 0,
+            a: cell.Color?.a ?? 255,
+          };
+          const hsl = rgbToHsl(baseColor.r, baseColor.g, baseColor.b);
           const nextSaturation = Math.max(0, Math.min(1, hsl.s * factor));
           const rgb = hslToRgb(hsl.h, nextSaturation, hsl.l);
-          cell.Color = { r: rgb.r, g: rgb.g, b: rgb.b, a: color.a ?? 255 };
+          cell.Color = { r: rgb.r, g: rgb.g, b: rgb.b, a: baseColor.a ?? 255 };
         });
         writeLevel(level);
         safeRender();
@@ -1027,9 +1052,16 @@
     });
 
     saturationSlider.addEventListener('change', () => {
-      setLevelSaturation(saturationSlider.value);
-      saturationSlider.value = '100';
-      saturationLabel.textContent = '100%';
+      setLevelSaturationFromBase(saturationSlider.value);
+    });
+
+    setSaturationBaseBtn.addEventListener('click', () => {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        rememberBaseColors(level);
+        error.textContent = 'Базовые цвета насыщенности обновлены.';
+      } catch {}
     });
 
     viewport.addEventListener('mousedown', (event) => {
@@ -1039,6 +1071,10 @@
 
     applyZoom();
     safeRender(true);
+    try {
+      const level = JSON.parse(input.value);
+      rememberBaseColors(level);
+    } catch {}
   </script>
 </body>
 </html>
