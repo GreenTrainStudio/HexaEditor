@@ -92,6 +92,11 @@
         <button id="zoomInBtn" type="button">+</button>
         <span id="zoomLabel">Масштаб: 100%</span>
       </div>
+      <div class="action-row">
+        <label for="saturationSlider">Насыщенность уровня:</label>
+        <input id="saturationSlider" type="range" min="0" max="200" step="1" value="100" />
+        <span id="saturationLabel">100%</span>
+      </div>
       <div class="mode-status">
         <button id="deleteModeLabel" class="mode-btn" type="button">Режим удаления: выкл (клавиша D)</button>
         <button id="addModeLabel" class="mode-btn" type="button">Режим добавления: выкл (клавиша A)</button>
@@ -130,6 +135,8 @@
     const zoomInBtn = document.getElementById('zoomInBtn');
     const zoomOutBtn = document.getElementById('zoomOutBtn');
     const zoomLabel = document.getElementById('zoomLabel');
+    const saturationSlider = document.getElementById('saturationSlider');
+    const saturationLabel = document.getElementById('saturationLabel');
     const deleteModeLabel = document.getElementById('deleteModeLabel');
     const addModeLabel = document.getElementById('addModeLabel');
     const rotateModeLabel = document.getElementById('rotateModeLabel');
@@ -772,6 +779,72 @@
       };
     }
 
+    function rgbToHsl(r, g, b) {
+      const rn = r / 255;
+      const gn = g / 255;
+      const bn = b / 255;
+      const max = Math.max(rn, gn, bn);
+      const min = Math.min(rn, gn, bn);
+      const d = max - min;
+      let h = 0;
+      let s = 0;
+      const l = (max + min) / 2;
+
+      if (d !== 0) {
+        s = d / (1 - Math.abs(2 * l - 1));
+        switch (max) {
+          case rn: h = ((gn - bn) / d) % 6; break;
+          case gn: h = ((bn - rn) / d) + 2; break;
+          default: h = ((rn - gn) / d) + 4; break;
+        }
+        h *= 60;
+        if (h < 0) h += 360;
+      }
+      return { h, s, l };
+    }
+
+    function hslToRgb(h, s, l) {
+      const c = (1 - Math.abs(2 * l - 1)) * s;
+      const hh = h / 60;
+      const x = c * (1 - Math.abs((hh % 2) - 1));
+      let r1 = 0;
+      let g1 = 0;
+      let b1 = 0;
+
+      if (hh >= 0 && hh < 1) { r1 = c; g1 = x; }
+      else if (hh < 2) { r1 = x; g1 = c; }
+      else if (hh < 3) { g1 = c; b1 = x; }
+      else if (hh < 4) { g1 = x; b1 = c; }
+      else if (hh < 5) { r1 = x; b1 = c; }
+      else { r1 = c; b1 = x; }
+
+      const m = l - c / 2;
+      return {
+        r: Math.round((r1 + m) * 255),
+        g: Math.round((g1 + m) * 255),
+        b: Math.round((b1 + m) * 255),
+      };
+    }
+
+    function setLevelSaturation(percent) {
+      try {
+        const level = JSON.parse(input.value);
+        if (!Array.isArray(level.Cells)) return;
+        const factor = Math.max(0, Number(percent) / 100);
+        undoStack.push(JSON.stringify(level));
+        level.Cells.forEach(cell => {
+          const color = cell.Color;
+          if (!color) return;
+          const hsl = rgbToHsl(color.r ?? 0, color.g ?? 0, color.b ?? 0);
+          const nextSaturation = Math.max(0, Math.min(1, hsl.s * factor));
+          const rgb = hslToRgb(hsl.h, nextSaturation, hsl.l);
+          cell.Color = { r: rgb.r, g: rgb.g, b: rgb.b, a: color.a ?? 255 };
+        });
+        writeLevel(level);
+        safeRender();
+      } catch {}
+    }
+
     function hideColorPicker() {
       colorPickerPopup.style.display = 'none';
       activeColorCell = null;
@@ -947,6 +1020,16 @@
       if (!rgb) return;
       setPickerValues(rgb);
       applyColorToActiveCell(rgb);
+    });
+
+    saturationSlider.addEventListener('input', () => {
+      saturationLabel.textContent = `${saturationSlider.value}%`;
+    });
+
+    saturationSlider.addEventListener('change', () => {
+      setLevelSaturation(saturationSlider.value);
+      saturationSlider.value = '100';
+      saturationLabel.textContent = '100%';
     });
 
     viewport.addEventListener('mousedown', (event) => {
